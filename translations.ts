@@ -1,8 +1,12 @@
 
+
 import { Language } from "./types";
 
 export const translations = {
   ar: {
+    // Brand Slogan
+    brandSlogan: "في كل قطرة ماء.. بذرة حياة جديدة",
+
     // Auth & Onboarding
     welcome: "أهلاً بك في سكينة",
     slogan: "رفيقك نحو الطمأنينة",
@@ -19,6 +23,15 @@ export const translations = {
     forgotPass: "هل نسيت كلمة المرور؟",
     contactSupport: "تواصل مع الدعم",
     
+    // Password Recovery
+    forgotPassTitle: "استعادة كلمة المرور",
+    forgotPassDesc: "أدخل بريدك الإلكتروني وسنرسل لك رابطاً لإعادة تعيين كلمة المرور.",
+    sendResetLink: "إرسال رابط الاستعادة",
+    backToLogin: "العودة لتسجيل الدخول",
+    resetLinkSent: "تم إرسال الرابط!",
+    checkEmail: "تحقق من صندوق الوارد الخاص بك لإنشاء كلمة مرور جديدة.",
+    sending: "جاري الإرسال...",
+
     // Onboarding Slides
     slide1Title: "رفيق ذكي",
     slide1Desc: "متاح 24/7 ليسمعك ويدعمك بذكاء عاطفي متطور.",
@@ -44,6 +57,9 @@ export const translations = {
     dailyChallenge: "تحدي اليوم",
     challengeCompleted: "تم إنجاز التحدي!",
     markComplete: "إتمام المهمة",
+    offlineTitle: "أنت غير متصل",
+    offlineDesc: "تعمل الآن في الوضع غير المتصل. الميزات الذكية قد تكون محدودة.",
+    emergencyNumber: "123",
     
     // New Revolutionary Features
     soulGarden: "حديقة الروح",
@@ -70,6 +86,12 @@ export const translations = {
     storyTopic: "عن ماذا تريد القصة؟ (مثال: غابة ممطرة، مكتبة قديمة)",
     storyTopicPlaceholder: "أدخل موضوع القصة...",
     listeningStory: "جاري تأليف قصة هادئة...",
+    grandmaTales: "حكايات الجدة (تيتا)",
+    sleepMusic: "موسيقى للنوم",
+    tellMeStory: "احكِ لي حدوتة (يا تيتا)",
+    chooseTrack: "اختر مقطعاً للاسترخاء",
+    nowPlaying: "جاري التشغيل",
+    minutes: "دقيقة",
 
     // Breathing
     startBreathing: "ابدأ التنفس",
@@ -115,6 +137,7 @@ export const translations = {
     timeRemaining: "الوقت المتبقي",
     sessionEnded: "انتهى وقت الجلسة",
     extendSession: "هل تود تمديد الجلسة؟",
+    scrollToBottom: "للأحدث",
     
     // Baraem
     baraemTitle: "إعداد خطة براعم",
@@ -142,6 +165,17 @@ export const translations = {
     noUpcoming: "لا توجد جلسات مجدولة",
     reschedule: "تغيير الموعد",
     
+    // Journal Page
+    myJournal: "مذكراتي",
+    newEntry: "تدوين جديد",
+    viewJournal: "عرض كل المذكرات",
+    noEntries: "لا توجد مذكرات بعد. ابدأ التدوين اليوم!",
+    entrySaved: "تم حفظ التدوينة",
+    sentimentAnalysis: "تحليل المشاعر",
+    positive: "إيجابي",
+    neutral: "محايد",
+    negative: "سلبي",
+    
     // Partner Linking
     relationshipProfile: "إعدادات العلاقات",
     yourUsername: "اسم المستخدم الخاص بك",
@@ -152,6 +186,10 @@ export const translations = {
     connected: "مرتبط",
 
     // Settings
+    personalization: "التخصيص",
+    voiceSpeed: "سرعة صوت سكينة",
+    emergencyContact: "رقم الطوارئ الموثوق",
+    emergencyContactPlaceholder: "أدخل رقم شخص تثق به",
     notifications: "الإشعارات",
     notificationsDesc: "تذكيرات الجلسات والنصائح اليومية",
     darkMode: "الوضع الليلي",
@@ -162,6 +200,27 @@ export const translations = {
     exportDesc: "حمل نسخة من سجلك",
     privacyPolicy: "سياسة الخصوصية",
     confirmClear: "هل أنت متأكد؟ سيتم حذف جميع المحادثات.",
+    appLock: "قفل التطبيق (PIN)",
+    setupPin: "إنشاء رمز مرور",
+    changePin: "تغيير رمز المرور",
+    removePin: "إلغاء القفل",
+    pinSetupSuccess: "تم تفعيل القفل بنجاح",
+    pinRemoveSuccess: "تم إلغاء القفل",
+
+    // PIN Lock
+    enterPin: "أدخل رمز المرور",
+    createPin: "إنشاء رمز مرور جديد",
+    confirmPin: "تأكيد رمز المرور",
+    incorrectPin: "الرمز غير صحيح",
+    pinsDoNotMatch: "الرموز غير متطابقة",
+    lockedDesc: "تطبيقك محمي لضمان خصوصيتك",
+    forgotPin: "نسيت الرمز؟",
+    resetData: "إعادة ضبط البيانات",
+
+    // Error Boundary
+    errorTitle: "عذراً، حدث خطأ ما",
+    errorDesc: "واجه التطبيق مشكلة غير متوقعة. نحن نعمل على إصلاحها.",
+    reloadApp: "إعادة تحميل التطبيق",
 
     // Help
     helpTitle: "المساعدة والدعم",
@@ -205,6 +264,14 @@ export const translations = {
     reminder1hBody: "تبدأ جلستك خلال ساعة. يمكنك تغيير الموعد الآن إذا لزم الأمر.",
     bookingConfirmedTitle: "تم تأكيد الحجز",
     
+    // Subscription
+    subTitle: "رحلة السكينة مستمرة...",
+    subDesc: "انتهت فترة تجربتك المجانية (14 يوم). لاستكمال رحلة التعافي والوصول إلى كافة المزايا، يرجى الاشتراك.",
+    subPriceEg: "200 جنيه / شهرياً",
+    subPriceInt: "7 دولار / شهرياً",
+    subButton: "اشترك الآن واستثمر في راحتك",
+    subNote: "يمكنك الإلغاء في أي وقت.",
+
     // Moods
     mood_happy: "سعيد",
     mood_normal: "عادي",
@@ -215,30 +282,52 @@ export const translations = {
     // Categories
     cat_baraem_title: "براعم (تنمية المهارات)",
     cat_baraem_desc: "قسم متخصص لأبطال التوحد وتشتت الانتباه (ADHD) وذويهم.",
+    cat_baraem_science: "يعتمد على تحليل السلوك التطبيقي (ABA) واستراتيجيات التربية الإيجابية.",
+    
     cat_relationships_title: "العلاقات",
     cat_relationships_desc: "تحسين التواصل، حل النزاعات، وبناء التفاهم المشترك.",
+    cat_relationships_science: "يستند إلى طريقة جوتمان (Gottman Method) والعلاج المرتكز على العاطفة (EFT).",
+    
     cat_general_title: "الاستشارة العامة",
     cat_general_desc: "مساحة حرة للفضفضة والحديث عن كل ما يثقل قلبك.",
+    cat_general_science: "يستخدم مبادئ علم النفس الإيجابي والدعم الوجداني.",
+    
     cat_depression_title: "الاكتئاب والحزن",
     cat_depression_desc: "عندما يغيب الشغف ويسيطر الحزن المستمر.",
+    cat_depression_science: "يعتمد على العلاج المعرفي السلوكي (CBT) والتنشيط السلوكي.",
+    
     cat_anxiety_title: "القلق والتوتر",
     cat_anxiety_desc: "تهدئة الأفكار المتسارعة والمخاوف المستمرة.",
+    cat_anxiety_science: "يستخدم تقنيات تقليل التوتر القائم على اليقظة (MBSR) والتأريض.",
+    
     cat_ocd_title: "الوسواس القهري",
     cat_ocd_desc: "التعامل مع الأفكار الملحة والأفعال التكرارية.",
+    cat_ocd_science: "يستند إلى التعرض ومنع الاستجابة (ERP) والعلاج المعرفي.",
+    
     cat_ptsd_title: "تجاوز الصدمات",
     cat_ptsd_desc: "للتعافي من آثار الماضي والذكريات المؤلمة.",
+    cat_ptsd_science: "يعتمد على علاج المعالجة المعرفية (CPT) وتقنيات التهدئة الذاتية.",
+    
     cat_bipolar_title: "ثنائي القطب",
     cat_bipolar_desc: "إدارة تقلبات المزاج والطاقة.",
+    cat_bipolar_science: "يركز على تنظيم الإيقاع الاجتماعي (IPSRT) والتثقيف النفسي.",
+    
     cat_social_phobia_title: "الرهاب الاجتماعي",
     cat_social_phobia_desc: "بناء الثقة والراحة في المواقف الاجتماعية.",
+    cat_social_phobia_science: "يستخدم العلاج بالتعرض (Exposure Therapy) وإعادة الهيكلة المعرفية.",
+    
     cat_sleep_title: "مشاكل النوم",
     cat_sleep_desc: "تحسين جودة النوم وعلاج الأرق.",
+    cat_sleep_science: "يعتمد على العلاج السلوكي المعرفي للأرق (CBT-I).",
 
     // Disclaimer
     disclaimerTitle: "تنويه هام",
     acceptContinue: "أوافق وأريد المتابعة",
   },
   en: {
+    // Brand Slogan
+    brandSlogan: "In every drop of water, a seed of new life",
+
     // Auth & Onboarding
     welcome: "Welcome to Sakinnah",
     slogan: "Your Companion to Serenity",
@@ -254,6 +343,15 @@ export const translations = {
     secureData: "Your data is fully encrypted & private",
     forgotPass: "Forgot Password?",
     contactSupport: "Contact Support",
+
+    // Password Recovery
+    forgotPassTitle: "Password Recovery",
+    forgotPassDesc: "Enter your email to receive a reset link.",
+    sendResetLink: "Send Link",
+    backToLogin: "Back to Login",
+    resetLinkSent: "Link Sent!",
+    checkEmail: "Check your inbox to create a new password.",
+    sending: "Sending...",
 
     // Onboarding Slides
     slide1Title: "AI Companion",
@@ -280,6 +378,9 @@ export const translations = {
     dailyChallenge: "Daily Challenge",
     challengeCompleted: "Challenge Completed!",
     markComplete: "Mark Complete",
+    offlineTitle: "You are offline",
+    offlineDesc: "You are currently offline. Smart features may be limited.",
+    emergencyNumber: "911",
 
     // New Revolutionary Features
     soulGarden: "Soul Garden",
@@ -306,6 +407,12 @@ export const translations = {
     storyTopic: "What should the story be about? (e.g., Rainy Forest, Old Library)",
     storyTopicPlaceholder: "Enter story topic...",
     listeningStory: "Weaving a calming tale...",
+    grandmaTales: "Grandma's Tales",
+    sleepMusic: "Sleep Music",
+    tellMeStory: "Tell me a Story (Grandma)",
+    chooseTrack: "Choose a relaxing track",
+    nowPlaying: "Now Playing",
+    minutes: "min",
 
     // Breathing
     startBreathing: "Start Breathing",
@@ -351,6 +458,7 @@ export const translations = {
     timeRemaining: "Time Remaining",
     sessionEnded: "Session Ended",
     extendSession: "Extend Session?",
+    scrollToBottom: "To Latest",
 
     // Baraem
     baraemTitle: "Baraem Plan Setup",
@@ -378,6 +486,17 @@ export const translations = {
     noUpcoming: "No sessions scheduled",
     reschedule: "Reschedule",
     
+    // Journal Page
+    myJournal: "My Journal",
+    newEntry: "New Entry",
+    viewJournal: "View All Entries",
+    noEntries: "No journal entries yet. Start writing today!",
+    entrySaved: "Entry Saved",
+    sentimentAnalysis: "Sentiment Analysis",
+    positive: "Positive",
+    neutral: "Neutral",
+    negative: "Negative",
+    
     // Partner Linking
     relationshipProfile: "Relationship Settings",
     yourUsername: "Your Username",
@@ -388,6 +507,10 @@ export const translations = {
     connected: "Connected",
 
     // Settings
+    personalization: "Personalization",
+    voiceSpeed: "Sakinnah's Voice Speed",
+    emergencyContact: "Trusted Emergency Contact",
+    emergencyContactPlaceholder: "Enter trusted phone number",
     notifications: "Notifications",
     notificationsDesc: "Session reminders and daily tips",
     darkMode: "Dark Mode",
@@ -398,6 +521,27 @@ export const translations = {
     exportDesc: "Download a copy of your records",
     privacyPolicy: "Privacy Policy",
     confirmClear: "Are you sure? This will delete all local chat history.",
+    appLock: "App Lock (PIN)",
+    setupPin: "Setup Passcode",
+    changePin: "Change Passcode",
+    removePin: "Remove Lock",
+    pinSetupSuccess: "App Lock Enabled",
+    pinRemoveSuccess: "App Lock Removed",
+
+    // PIN Lock
+    enterPin: "Enter Passcode",
+    createPin: "Create New Passcode",
+    confirmPin: "Confirm Passcode",
+    incorrectPin: "Incorrect Passcode",
+    pinsDoNotMatch: "Passcodes do not match",
+    lockedDesc: "Protected for your privacy",
+    forgotPin: "Forgot Passcode?",
+    resetData: "Reset Data",
+
+    // Error Boundary
+    errorTitle: "Something went wrong",
+    errorDesc: "The app encountered an unexpected error. We are working on it.",
+    reloadApp: "Reload App",
 
     // Help
     helpTitle: "Help & Support",
@@ -441,6 +585,14 @@ export const translations = {
     reminder1hBody: "Your session is in 1 hour. You can reschedule now if needed.",
     bookingConfirmedTitle: "Booking Confirmed",
 
+    // Subscription
+    subTitle: "The Journey Continues...",
+    subDesc: "Your 14-day free trial has ended. To continue your path to serenity and access all features, please subscribe.",
+    subPriceEg: "200 EGP / Month",
+    subPriceInt: "$7 / Month",
+    subButton: "Subscribe for Peace of Mind",
+    subNote: "Cancel anytime.",
+
     // Moods
     mood_happy: "Happy",
     mood_normal: "Normal",
@@ -451,24 +603,43 @@ export const translations = {
     // Categories
     cat_baraem_title: "Baraem (Development)",
     cat_baraem_desc: "Specialized support for Autism (ASD) & ADHD heroes.",
+    cat_baraem_science: "Based on Applied Behavior Analysis (ABA) and Positive Parenting strategies.",
+    
     cat_relationships_title: "Relationships",
     cat_relationships_desc: "Improving communication, conflict resolution, and understanding.",
+    cat_relationships_science: "Based on the Gottman Method and Emotionally Focused Therapy (EFT).",
+    
     cat_general_title: "General Consult",
     cat_general_desc: "A safe space to vent and talk about anything.",
+    cat_general_science: "Uses principles of Positive Psychology and empathetic support.",
+    
     cat_depression_title: "Depression",
     cat_depression_desc: "When passion fades and sadness takes over.",
+    cat_depression_science: "Based on Cognitive Behavioral Therapy (CBT) and Behavioral Activation.",
+    
     cat_anxiety_title: "Anxiety & Stress",
     cat_anxiety_desc: "Calming racing thoughts and constant worries.",
+    cat_anxiety_science: "Uses Mindfulness-Based Stress Reduction (MBSR) and Grounding techniques.",
+    
     cat_ocd_title: "OCD",
     cat_ocd_desc: "Managing intrusive thoughts and repetitive actions.",
+    cat_ocd_science: "Based on Exposure and Response Prevention (ERP) and Cognitive Therapy.",
+    
     cat_ptsd_title: "Trauma Recovery",
     cat_ptsd_desc: "Healing from the past and painful memories.",
+    cat_ptsd_science: "Based on Cognitive Processing Therapy (CPT) and Self-Soothing techniques.",
+    
     cat_bipolar_title: "Bipolar",
     cat_bipolar_desc: "Managing mood swings and energy levels.",
+    cat_bipolar_science: "Focuses on Interpersonal and Social Rhythm Therapy (IPSRT).",
+    
     cat_social_phobia_title: "Social Phobia",
     cat_social_phobia_desc: "Building confidence in social situations.",
+    cat_social_phobia_science: "Uses Exposure Therapy and Cognitive Restructuring.",
+    
     cat_sleep_title: "Sleep Issues",
     cat_sleep_desc: "Improving sleep quality and treating insomnia.",
+    cat_sleep_science: "Based on Cognitive Behavioral Therapy for Insomnia (CBT-I).",
 
     // Disclaimer
     disclaimerTitle: "Important Disclaimer",

@@ -1,26 +1,31 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { CATEGORIES, NOTIFICATIONS, DISCLAIMER_TEXT_AR, DISCLAIMER_TEXT_EN, DAILY_CHALLENGES } from './constants';
 import { Category, ViewState, User, Language, DailyChallenge, BookedSession } from './types';
 import { translations } from './translations';
 import DisclaimerModal from './components/DisclaimerModal';
 import CategoryCard from './components/CategoryCard';
-import ChatInterface from './components/ChatInterface';
 import LoginPage from './components/LoginPage';
-import ProfilePage from './components/ProfilePage';
-import SettingsPage from './components/SettingsPage';
-import HelpPage from './components/HelpPage';
-import BreathingExercise from './components/BreathingExercise';
-import SoulGarden from './components/SoulGarden';
-import DreamAnalyzer from './components/DreamAnalyzer';
-import GroundingCanvas from './components/GroundingCanvas';
-import BookingCalendar from './components/BookingCalendar';
-import CategoryInfoModal from './components/CategoryInfoModal';
-import SleepSanctuary from './components/SleepSanctuary';
-import MoodTracker from './components/MoodTracker';
-import { Heart, Menu, Bell, LogOut, Phone, X, User as UserIcon, Settings, HelpCircle, ChevronLeft, ChevronRight, Wind, Sprout, Download, BookOpen, Clock, PlayCircle, Check, Trophy, Moon, Zap, Smile } from 'lucide-react';
+import ErrorBoundary from './components/ErrorBoundary';
+import PinLock from './components/PinLock';
+import { Heart, Menu, Bell, LogOut, Phone, X, User as UserIcon, Settings, HelpCircle, ChevronLeft, ChevronRight, Wind, Sprout, Download, BookOpen, Clock, PlayCircle, Check, Trophy, Moon, Zap, Smile, PenTool, WifiOff } from 'lucide-react';
 import * as Icons from 'lucide-react';
 import { syncService } from './services/syncService';
+
+// --- LAZY LOADED COMPONENTS (Performance Engine) ---
+const ChatInterface = lazy(() => import('./components/ChatInterface'));
+const ProfilePage = lazy(() => import('./components/ProfilePage'));
+const SettingsPage = lazy(() => import('./components/SettingsPage'));
+const HelpPage = lazy(() => import('./components/HelpPage'));
+const BreathingExercise = lazy(() => import('./components/BreathingExercise'));
+const SoulGarden = lazy(() => import('./components/SoulGarden'));
+const DreamAnalyzer = lazy(() => import('./components/DreamAnalyzer'));
+const GroundingCanvas = lazy(() => import('./components/GroundingCanvas'));
+const BookingCalendar = lazy(() => import('./components/BookingCalendar'));
+const CategoryInfoModal = lazy(() => import('./components/CategoryInfoModal'));
+const SleepSanctuary = lazy(() => import('./components/SleepSanctuary'));
+const SubscriptionScreen = lazy(() => import('./components/SubscriptionScreen')); 
+const JournalPage = lazy(() => import('./components/JournalPage')); 
 
 const App: React.FC = () => {
   const [viewState, setViewState] = useState<ViewState>('LOGIN');
@@ -34,7 +39,9 @@ const App: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [lastMood, setLastMood] = useState<string | null>(null);
-  const [showMoodCheckIn, setShowMoodCheckIn] = useState(false);
+  
+  // Security State
+  const [isLocked, setIsLocked] = useState(false);
   
   // Daily Challenge State
   const [dailyChallenge, setDailyChallenge] = useState<DailyChallenge | null>(null);
@@ -49,9 +56,41 @@ const App: React.FC = () => {
   const [bookingMinDays, setBookingMinDays] = useState(0);
   const [sessionToReschedule, setSessionToReschedule] = useState<BookedSession | null>(null);
 
+  // Network State
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
   // Translations helper
   const t = translations[language];
   const isRTL = language === 'ar';
+
+  // Sound Helper
+  const playSound = (type: 'success' | 'click') => {
+      try {
+          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          
+          if (type === 'success') {
+             osc.type = 'triangle';
+             osc.frequency.setValueAtTime(400, ctx.currentTime);
+             osc.frequency.linearRampToValueAtTime(800, ctx.currentTime + 0.1);
+             osc.frequency.linearRampToValueAtTime(1200, ctx.currentTime + 0.3);
+             gain.gain.setValueAtTime(0.1, ctx.currentTime);
+             gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+             osc.start();
+             osc.stop(ctx.currentTime + 0.5);
+          } else {
+             osc.type = 'sine';
+             osc.frequency.setValueAtTime(600, ctx.currentTime);
+             gain.gain.setValueAtTime(0.05, ctx.currentTime);
+             gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+             osc.start();
+             osc.stop(ctx.currentTime + 0.1);
+          }
+      } catch (e) {}
+  };
 
   // Effect to update document direction
   useEffect(() => {
@@ -68,12 +107,25 @@ const App: React.FC = () => {
 
     // Auto-Sync on Network Recovery
     const handleOnline = () => {
+        setIsOffline(false);
         if (user) {
-            syncService.pushToCloud(user.username);
-            showToast(language === 'ar' ? 'أنت متصل الآن. تم مزامنة البيانات.' : 'Back online. Data synced.');
+            syncService.syncWithCloud(user.username).then(res => {
+                if (res === 'pushed') showToast(language === 'ar' ? 'تمت المزامنة (رفع)' : 'Data Synced (Pushed)');
+                if (res === 'pulled') {
+                    showToast(language === 'ar' ? 'تمت المزامنة (تحميل)' : 'Data Synced (Pulled)');
+                    findLastActiveSession(); // Refresh UI state
+                }
+            });
         }
     };
+    
+    const handleOffline = () => {
+        setIsOffline(true);
+        showToast(language === 'ar' ? 'أنت الآن غير متصل بالإنترنت' : 'You are now offline');
+    };
+
     window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
 
     // Determine Time of Day
     const hour = new Date().getHours();
@@ -97,14 +149,11 @@ const App: React.FC = () => {
 
     let challenge: DailyChallenge | undefined;
 
-    // Restore existing challenge for today
     if (savedChallengeDate === todayStr && savedChallengeId) {
         challenge = DAILY_CHALLENGES.find(c => c.id === savedChallengeId);
-        if (!challenge) console.warn("Saved challenge ID not found");
-        else if (savedChallengeStatus === todayStr) setIsChallengeCompleted(true);
+        if (savedChallengeStatus === todayStr) setIsChallengeCompleted(true);
     }
 
-    // Assign new challenge if needed
     if (!challenge) {
         challenge = DAILY_CHALLENGES[Math.floor(Math.random() * DAILY_CHALLENGES.length)];
         localStorage.setItem('sakinnah_challenge_date', todayStr);
@@ -118,20 +167,11 @@ const App: React.FC = () => {
     
     setDailyChallenge(challenge || null);
     
-    // --- DAILY MOOD CHECK-IN LOGIC ---
-    const lastMoodDate = localStorage.getItem('sakinnah_daily_mood_date');
+    // --- LOAD LAST MOOD (For Greeting Only) ---
     const lastMoodValue = localStorage.getItem('sakinnah_last_mood');
-    
-    if (savedUser) { // Only check mood if user is logged in
-        if (lastMoodDate !== todayStr) {
-            // New day, ask for mood
-            // Delay slightly to not clash with splash
-            setTimeout(() => setShowMoodCheckIn(true), 3000);
-        } else if (lastMoodValue) {
-            setLastMood(lastMoodValue);
-        }
+    if (savedUser && lastMoodValue) {
+        setLastMood(lastMoodValue);
     }
-    // -----------------------------------------
 
     if (savedLang && (savedLang === 'ar' || savedLang === 'en')) {
         setLanguage(savedLang as Language);
@@ -139,13 +179,34 @@ const App: React.FC = () => {
 
     if (savedUser) {
       try {
-        const parsedUser = JSON.parse(savedUser);
-        setUser(parsedUser);
-        setViewState('HOME');
-        findLastActiveSession();
-        syncService.pullFromCloud(parsedUser.username).then(success => {
-            if (success) findLastActiveSession();
-        });
+        const parsedUser: User = JSON.parse(savedUser);
+        
+        // --- SECURITY CHECK ---
+        if (parsedUser.pinCode) {
+            setIsLocked(true);
+        }
+
+        // --- SUBSCRIPTION CHECK (GATEKEEPER) ---
+        const regDate = parsedUser.registrationDate ? new Date(parsedUser.registrationDate) : new Date();
+        const now = new Date();
+        const diffTime = Math.abs(now.getTime() - regDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const trialDays = 14;
+
+        if (diffDays > trialDays && !parsedUser.isSubscribed) {
+            setUser(parsedUser);
+            setViewState('SUBSCRIPTION');
+        } else {
+            setUser(parsedUser);
+            setViewState('HOME');
+            findLastActiveSession();
+            
+            // --- TRIGGER SMART SYNC ---
+            syncService.syncWithCloud(parsedUser.username).then(res => {
+                if (res === 'pulled') findLastActiveSession(); // Refresh if new data came in
+            });
+        }
+        
       } catch (e) {
         localStorage.removeItem('sakinnah_user');
       }
@@ -154,14 +215,11 @@ const App: React.FC = () => {
     // --- NOTIFICATION POLLING ---
     const checkReminders = () => {
         if (!('Notification' in window) || Notification.permission !== 'granted') return;
-        
         const sessionsStr = localStorage.getItem('sakinnah_booked_sessions');
         if (!sessionsStr) return;
-        
         try {
             const sessions: BookedSession[] = JSON.parse(sessionsStr);
             const now = new Date();
-            
             sessions.forEach(session => {
                 const sessionDate = new Date(session.date);
                 const timeParts = session.time.match(/(\d+):(\d+) (AM|PM)/);
@@ -171,28 +229,15 @@ const App: React.FC = () => {
                     const ampm = timeParts[3];
                     if (ampm === 'PM' && hours < 12) hours += 12;
                     if (ampm === 'AM' && hours === 12) hours = 0;
-                    
                     sessionDate.setHours(hours, minutes, 0, 0);
-                    
                     const diff = sessionDate.getTime() - now.getTime();
-                    
-                    if (diff > 0 && diff <= 900000) { // 15 mins
+                    if (diff > 0 && diff <= 900000) { 
                          const notifKey = `notified_${session.id}`;
                          if (!localStorage.getItem(notifKey)) {
                              new Notification(language === 'ar' ? 'تذكير بالجلسة' : 'Session Reminder', {
                                  body: language === 'ar' ? `جلستك مع سكينة تبدأ خلال ${Math.ceil(diff / 60000)} دقيقة!` : `Your session with Sakinnah starts in ${Math.ceil(diff / 60000)} minutes!`
                              });
                              localStorage.setItem(notifKey, 'true');
-                         }
-                    }
-
-                    if (diff > 3500000 && diff <= 3600000) { // 1 hour
-                         const notifKey1h = `notified_1h_${session.id}`;
-                         if (!localStorage.getItem(notifKey1h)) {
-                             new Notification(language === 'ar' ? 'اقترب موعد جلستك' : 'Session in 1 Hour', {
-                                 body: language === 'ar' ? `تبدأ جلستك خلال ساعة. يمكنك تغيير الموعد الآن.` : `Your session is in 1 hour.`
-                             });
-                             localStorage.setItem(notifKey1h, 'true');
                          }
                     }
                 }
@@ -206,6 +251,7 @@ const App: React.FC = () => {
         clearTimeout(splashTimer);
         clearInterval(interval);
         window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
     }
   }, [language]);
 
@@ -247,6 +293,7 @@ const App: React.FC = () => {
   const handleCompleteChallenge = () => {
       setIsChallengeCompleted(true);
       setShowConfetti(true);
+      playSound('success'); // PLAY SOUND
       localStorage.setItem('sakinnah_challenge_completed', new Date().toDateString());
       if (user) syncService.pushToCloud(user.username);
       setTimeout(() => setShowConfetti(false), 4000);
@@ -257,13 +304,9 @@ const App: React.FC = () => {
     localStorage.setItem('sakinnah_user', JSON.stringify(userData));
     setViewState('DISCLAIMER');
     findLastActiveSession();
-    syncService.pullFromCloud(userData.username);
     
-    // Check mood on first login if not set today
-    const todayStr = new Date().toDateString();
-    if (localStorage.getItem('sakinnah_daily_mood_date') !== todayStr) {
-        setTimeout(() => setShowMoodCheckIn(true), 1500);
-    }
+    // Initial Sync
+    syncService.syncWithCloud(userData.username).then(() => findLastActiveSession());
   };
   
   const handleUpdateUser = (updatedUser: User) => {
@@ -272,6 +315,15 @@ const App: React.FC = () => {
       showToast(language === 'ar' ? 'تم تحديث الملف الشخصي' : 'Profile Updated');
       syncService.pushToCloud(updatedUser.username);
   };
+  
+  const handleSubscribe = () => {
+      if (user) {
+          const updatedUser: User = { ...user, isSubscribed: true };
+          handleUpdateUser(updatedUser);
+          setViewState('HOME');
+          showToast(language === 'ar' ? 'شكراً لاشتراكك! استمتع برحلة السكينة.' : 'Subscribed! Enjoy your journey.');
+      }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('sakinnah_user');
@@ -279,6 +331,7 @@ const App: React.FC = () => {
     setSelectedCategory(null);
     setViewState('LOGIN');
     setIsDrawerOpen(false);
+    setIsLocked(false);
   }
   
   const handleTriggerReschedule = (session: BookedSession) => {
@@ -312,33 +365,6 @@ const App: React.FC = () => {
               setDeferredPrompt(null);
           });
       }
-  };
-  
-  const handleMoodSelect = (mood: string) => {
-      setLastMood(mood);
-      setShowMoodCheckIn(false);
-      
-      const todayStr = new Date().toDateString();
-      localStorage.setItem('sakinnah_daily_mood_date', todayStr);
-      localStorage.setItem('sakinnah_last_mood', mood);
-      
-      // Save to history for chart
-      const historyKey = 'sakinnah_mood_history';
-      const existingHistory = JSON.parse(localStorage.getItem(historyKey) || '[]');
-      
-      // Convert text mood to value for chart
-      let val = 50;
-      if (mood.includes('سعيد') || mood.includes('Happy')) val = 100;
-      else if (mood.includes('عادي') || mood.includes('Normal')) val = 60;
-      else if (mood.includes('حزين') || mood.includes('Sad')) val = 30;
-      else if (mood.includes('قلق') || mood.includes('Anxious')) val = 40;
-      else if (mood.includes('غاضب') || mood.includes('Angry')) val = 20;
-      
-      existingHistory.push({ date: new Date(), value: val, mood: mood });
-      localStorage.setItem(historyKey, JSON.stringify(existingHistory));
-      
-      showToast(language === 'ar' ? 'تم تسجيل حالتك' : 'Mood logged');
-      if(user) syncService.pushToCloud(user.username);
   };
   
   const getGreeting = () => {
@@ -395,6 +421,12 @@ const App: React.FC = () => {
       </div>
   );
 
+  const LoadingScreen = () => (
+      <div className="fixed inset-0 bg-white/50 backdrop-blur-md flex items-center justify-center z-50">
+          <div className="w-12 h-12 border-4 border-primary-500 rounded-full border-t-transparent animate-spin"></div>
+      </div>
+  );
+
   if (showSplash) {
       return (
           <div className={`fixed inset-0 bg-gradient-to-br from-teal-500 to-emerald-700 z-[100] flex flex-col items-center justify-center text-white transition-all duration-1000 overflow-hidden`}>
@@ -406,7 +438,24 @@ const App: React.FC = () => {
               </div>
               <h1 className="text-4xl font-bold mt-6 tracking-wide animate-fadeIn font-sans drop-shadow-md">Sakinnah</h1>
               <p className="text-teal-100 text-sm tracking-[0.3em] uppercase mt-2 opacity-90 animate-fadeIn" style={{animationDelay: '0.3s'}}>سكينة</p>
+              
+              {/* BRAND SLOGAN ANIMATION */}
+              <p className="absolute bottom-10 text-teal-100/80 text-xs md:text-sm italic tracking-widest font-serif animate-fadeIn" style={{animationDelay: '1s'}}>
+                  "{t.brandSlogan}"
+              </p>
           </div>
+      );
+  }
+
+  // --- SECURITY LOCK SCREEN ---
+  if (isLocked && user) {
+      return (
+          <PinLock 
+            mode="unlock" 
+            language={language} 
+            storedPin={user.pinCode}
+            onSuccess={() => setIsLocked(false)}
+          />
       );
   }
 
@@ -414,7 +463,16 @@ const App: React.FC = () => {
     return <LoginPage onLogin={handleLogin} language={language} setLanguage={handleSetLanguage} />;
   }
 
+  if (viewState === 'SUBSCRIPTION') {
+      return (
+        <Suspense fallback={<LoadingScreen />}>
+            <SubscriptionScreen language={language} onSubscribe={handleSubscribe} />
+        </Suspense>
+      );
+  }
+
   return (
+    <ErrorBoundary>
     <div className={`min-h-screen font-sans text-gray-900 md:flex md:justify-center overflow-x-hidden ${isRTL ? 'font-sans' : 'font-[Inter]'}`}>
       
       {/* ARTISTIC BACKGROUND */}
@@ -426,28 +484,17 @@ const App: React.FC = () => {
       
       <div className="w-full md:max-w-md bg-white/30 backdrop-blur-3xl min-h-screen md:min-h-[90vh] md:my-4 md:rounded-[2.5rem] md:shadow-2xl md:border md:border-white/40 md:overflow-hidden relative flex flex-col transition-all duration-500 z-10">
         
-        {toastMessage && (
-            <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-gray-900/80 text-white px-6 py-3 rounded-full text-sm z-[60] animate-fadeIn shadow-xl backdrop-blur-md whitespace-nowrap border border-white/10">
-                {toastMessage}
+        {/* Offline Banner */}
+        {isOffline && (
+            <div className="bg-red-500/90 text-white text-xs text-center py-2 px-4 backdrop-blur-md sticky top-0 z-[60] animate-slideUp font-bold flex items-center justify-center gap-2">
+                <WifiOff size={14} />
+                <span>{t.offlineDesc}</span>
             </div>
         )}
 
-        {/* Daily Mood Check-in Modal */}
-        {showMoodCheckIn && (
-            <div className="absolute inset-0 z-[70] bg-white/80 backdrop-blur-xl flex flex-col items-center justify-center p-6 animate-fadeIn">
-                <div className="w-full max-w-sm text-center">
-                    <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-white/50">
-                        <Smile size={40} className="text-primary-600" />
-                    </div>
-                    <h2 className="text-2xl font-bold text-gray-800 mb-2">{language === 'ar' ? 'كيف تشعر اليوم؟' : 'How are you feeling today?'}</h2>
-                    <p className="text-gray-500 text-sm mb-8">{language === 'ar' ? 'تسجيل مشاعرك يساعدنا في خدمتك بشكل أفضل.' : 'Logging your mood helps us serve you better.'}</p>
-                    
-                    <MoodTracker onSelect={handleMoodSelect} language={language} />
-                    
-                    <button onClick={() => setShowMoodCheckIn(false)} className="mt-8 text-gray-400 text-sm hover:text-gray-600 font-medium">
-                        {language === 'ar' ? 'تخطي الآن' : 'Skip for now'}
-                    </button>
-                </div>
+        {toastMessage && (
+            <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-gray-900/80 text-white px-6 py-3 rounded-full text-sm z-[60] animate-fadeIn shadow-xl backdrop-blur-md whitespace-nowrap border border-white/10">
+                {toastMessage}
             </div>
         )}
 
@@ -461,13 +508,16 @@ const App: React.FC = () => {
         )}
         
         {infoCategory && (
-            <CategoryInfoModal 
-                category={infoCategory} 
-                language={language} 
-                onClose={() => setInfoCategory(null)} 
-            />
+            <Suspense fallback={null}>
+                <CategoryInfoModal 
+                    category={infoCategory} 
+                    language={language} 
+                    onClose={() => setInfoCategory(null)} 
+                />
+            </Suspense>
         )}
 
+        <Suspense fallback={<LoadingScreen />}>
         {viewState === 'BREATHING' && (
              <BreathingExercise onClose={() => setViewState('HOME')} language={language} />
         )}
@@ -478,6 +528,10 @@ const App: React.FC = () => {
 
         {viewState === 'DREAM' && (
             <DreamAnalyzer onBack={() => setViewState('HOME')} language={language} />
+        )}
+
+        {viewState === 'JOURNAL' && user && (
+            <JournalPage onBack={() => setViewState('HOME')} language={language} user={user} />
         )}
 
         {viewState === 'SLEEP_TOOL' && (
@@ -499,7 +553,7 @@ const App: React.FC = () => {
             />
         )}
 
-        {/* Sidebar & Notifications Panels - Same as before */}
+        {/* Sidebar & Notifications Panels */}
         {isDrawerOpen && (
             <div className="absolute inset-0 z-50 flex">
                 <div className="w-full bg-black/20 backdrop-blur-sm transition-opacity" onClick={() => setIsDrawerOpen(false)}></div>
@@ -523,6 +577,10 @@ const App: React.FC = () => {
                         <button onClick={() => { setIsDrawerOpen(false); setViewState('PROFILE'); }} className="w-full flex items-center gap-4 p-4 hover:bg-white/50 rounded-2xl transition-all group border border-transparent hover:border-white/60 hover:shadow-sm">
                             <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform"><UserIcon size={20} /></div>
                             <span className="font-bold text-gray-700">{t.profile}</span>
+                        </button>
+                        <button onClick={() => { setIsDrawerOpen(false); setViewState('JOURNAL'); }} className="w-full flex items-center gap-4 p-4 hover:bg-white/50 rounded-2xl transition-all group border border-transparent hover:border-white/60 hover:shadow-sm">
+                            <div className="w-10 h-10 bg-pink-50 rounded-full flex items-center justify-center text-pink-500 group-hover:scale-110 transition-transform"><PenTool size={20} /></div>
+                            <span className="font-bold text-gray-700">{t.myJournal}</span>
                         </button>
                         <button onClick={() => { setIsDrawerOpen(false); setViewState('SETTINGS'); }} className="w-full flex items-center gap-4 p-4 hover:bg-white/50 rounded-2xl transition-all group border border-transparent hover:border-white/60 hover:shadow-sm">
                             <div className="w-10 h-10 bg-purple-50 rounded-full flex items-center justify-center text-purple-500 group-hover:scale-110 transition-transform"><Settings size={20} /></div>
@@ -562,7 +620,10 @@ const App: React.FC = () => {
                      <div className="flex-1 overflow-y-auto p-6 space-y-4">
                         {NOTIFICATIONS.map(notif => (
                             <div key={notif.id} className="flex gap-4 p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                                <div className={`w-12 h-12 ${notif.color} rounded-2xl flex items-center justify-center flex-shrink-0`}><Bell size={20} /></div>
+                                <div className={`w-12 h-12 ${notif.color} rounded-2xl flex items-center justify-center flex-shrink-0`}>
+                                    {/* SAFETY FIX: Add fallback for missing notification icon */}
+                                    {React.createElement((Icons as any)[notif.icon] || Icons.Bell, { size: 20 })}
+                                </div>
                                 <div>
                                     <h4 className="text-sm font-bold text-gray-900">{notif.title}</h4>
                                     <p className="text-xs text-gray-500 mt-1 leading-relaxed">{notif.body}</p>
@@ -583,6 +644,7 @@ const App: React.FC = () => {
                 language={language} 
                 onUpdateUser={handleUpdateUser} 
                 onReschedule={handleTriggerReschedule} 
+                onViewJournal={() => setViewState('JOURNAL')}
             />
         ) : viewState === 'SETTINGS' && user ? (
             <SettingsPage user={user} onBack={() => setViewState('HOME')} onLogout={handleLogout} language={language} setLanguage={handleSetLanguage} />
@@ -651,20 +713,16 @@ const App: React.FC = () => {
                           <span className="text-sm font-bold text-gray-800 relative z-10">{t.dreamAnalysis}</span>
                       </button>
                       
-                      <button onClick={() => setViewState('SLEEP_TOOL')} className="col-span-2 bg-gradient-to-r from-indigo-900 to-slate-800 p-5 rounded-3xl border border-indigo-500/30 flex items-center justify-between text-left gap-4 shadow-lg shadow-indigo-900/20 hover:shadow-indigo-900/40 transition-all active:scale-95 group relative overflow-hidden">
+                      <button onClick={() => setViewState('JOURNAL')} className="bg-gradient-to-br from-pink-50 to-rose-50 p-4 rounded-3xl border border-rose-100 flex flex-col items-center justify-center text-center gap-2 shadow-sm hover:shadow-md transition-all active:scale-95 group relative overflow-hidden">
+                          <div className="absolute inset-0 bg-white/20 backdrop-blur-[1px]"></div>
+                          <div className="w-10 h-10 bg-rose-100 rounded-full flex items-center justify-center text-rose-600 relative z-10 group-hover:scale-110 transition-transform"><PenTool size={20} /></div>
+                          <span className="text-sm font-bold text-gray-800 relative z-10">{t.myJournal}</span>
+                      </button>
+
+                      <button onClick={() => setViewState('SLEEP_TOOL')} className="bg-gradient-to-br from-indigo-900 to-slate-800 p-4 rounded-3xl border border-indigo-500/30 flex flex-col items-center justify-center text-center gap-2 shadow-lg shadow-indigo-900/20 hover:shadow-indigo-900/40 transition-all active:scale-95 group relative overflow-hidden text-white">
                           <div className="absolute top-0 right-0 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10"></div>
-                          <div className="flex items-center gap-4 relative z-10">
-                              <div className="w-12 h-12 bg-indigo-800/50 rounded-2xl flex items-center justify-center text-indigo-200 border border-indigo-500/30">
-                                  <Moon size={24} className="fill-current" />
-                              </div>
-                              <div>
-                                  <h3 className="font-bold text-white text-base">{t.sleepSanctuary}</h3>
-                                  <p className="text-xs text-indigo-200">{t.sleepSanctuaryDesc}</p>
-                              </div>
-                          </div>
-                          <div className="bg-white/10 p-2 rounded-full text-white">
-                              {isRTL ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
-                          </div>
+                          <div className="w-10 h-10 bg-indigo-800/50 rounded-full flex items-center justify-center text-indigo-200 border border-indigo-500/30 relative z-10"><Moon size={20} className="fill-current" /></div>
+                          <span className="text-sm font-bold relative z-10">{t.sleepSanctuary}</span>
                       </button>
                   </div>
               </div>
@@ -714,7 +772,7 @@ const App: React.FC = () => {
                           <div className={`w-full p-5 rounded-[2rem] shadow-sm border flex items-center justify-between relative overflow-hidden backdrop-blur-md transition-all ${isChallengeCompleted ? 'bg-green-50/80 border-green-200' : 'bg-white/60 border-white/50'}`}>
                               <div className="flex items-center gap-4 relative z-10">
                                   <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-sm ${isChallengeCompleted ? 'bg-green-500 text-white' : dailyChallenge.color}`}>
-                                      {isChallengeCompleted ? <Check size={24} /> : React.createElement((Icons as any)[dailyChallenge.icon], { size: 24 })}
+                                      {isChallengeCompleted ? <Check size={24} /> : React.createElement((Icons as any)[dailyChallenge.icon] || Icons.HelpCircle, { size: 24 })}
                                   </div>
                                   <div>
                                       <h3 className="font-bold text-sm text-gray-800 mb-0.5">{isChallengeCompleted ? t.challengeCompleted : t.dailyChallenge}</h3>
@@ -744,7 +802,7 @@ const App: React.FC = () => {
                         </div>
                      </button>
                      
-                     <a href="tel:911" className="pointer-events-auto w-14 h-14 bg-red-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/30 hover:bg-red-600 transition-colors active:scale-95">
+                     <a href={`tel:${user?.emergencyContact || t.emergencyNumber}`} className="pointer-events-auto w-14 h-14 bg-red-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/30 hover:bg-red-600 transition-colors active:scale-95">
                          <Phone size={24} />
                      </a>
                 </div>
@@ -762,8 +820,10 @@ const App: React.FC = () => {
             onBookSession={() => { setViewState('BOOKING'); setBookingMinDays(2); }}
           />
         ) : null}
+        </Suspense>
       </div>
     </div>
+    </ErrorBoundary>
   );
 };
 

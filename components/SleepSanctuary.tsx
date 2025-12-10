@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { Language } from '../types';
 import { translations } from '../translations';
-import { SLEEP_STORY_PROMPT_AR, SLEEP_STORY_PROMPT_EN } from '../constants';
+import { GRANDMA_STORY_PROMPT_AR, CHILD_STORY_TOPICS, SLEEP_MUSIC_TRACKS } from '../constants';
 import { sendMessageStreamToGemini, initializeChat } from '../services/geminiService';
-import { ArrowRight, ArrowLeft, Moon, Stars, Clock, BookOpen, Send, Mic, Play, Pause, StopCircle, X } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Moon, Stars, Clock, BookOpen, Music, Play, Pause, StopCircle, X, Headphones, User } from 'lucide-react';
 
 interface Props {
   onBack: () => void;
@@ -14,14 +15,37 @@ const SleepSanctuary: React.FC<Props> = ({ onBack, language }) => {
   const t = translations[language] as any;
   const isRTL = language === 'ar';
   
-  const [activeTab, setActiveTab] = useState<'calculator' | 'story'>('calculator');
+  const [activeView, setActiveView] = useState<'menu' | 'calculator' | 'stories' | 'music'>('menu');
   const [wakeTime, setWakeTime] = useState('07:00');
   const [bedtimes, setBedtimes] = useState<string[]>([]);
   
-  const [storyTopic, setStoryTopic] = useState('');
+  // Story State
   const [storyText, setStoryText] = useState('');
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [storyTitle, setStoryTitle] = useState('');
+  
+  // TTS State
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const speechQueueRef = useRef<string[]>([]);
+  const isCancelledRef = useRef(false);
+
+  // Music State
+  const [currentTrack, setCurrentTrack] = useState<any>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [trackProgress, setTrackProgress] = useState(0);
+
+  // --- TTS SETUP ---
+  useEffect(() => {
+      const loadVoices = () => setVoices(window.speechSynthesis.getVoices());
+      loadVoices();
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+      
+      return () => {
+          stopReading();
+          window.speechSynthesis.onvoiceschanged = null;
+      }
+  }, []);
 
   // SLEEP CALCULATOR LOGIC
   const calculateSleep = () => {
@@ -37,52 +61,114 @@ const SleepSanctuary: React.FC<Props> = ({ onBack, language }) => {
       setBedtimes(times);
   };
 
-  // STORY GENERATOR LOGIC
-  const generateStory = async () => {
-      if (!storyTopic.trim()) return;
+  // GRANDMA STORY LOGIC
+  const handleGrandmaStory = async () => {
+      // 1. Pick Random Topic
+      const randomTopic = CHILD_STORY_TOPICS[Math.floor(Math.random() * CHILD_STORY_TOPICS.length)];
+      setStoryTitle(randomTopic);
       setIsGeneratingStory(true);
       setStoryText('');
-      window.speechSynthesis.cancel();
+      stopReading();
       
-      const prompt = language === 'ar' 
-          ? SLEEP_STORY_PROMPT_AR.replace('[Topic]', storyTopic)
-          : SLEEP_STORY_PROMPT_EN.replace('[Topic]', storyTopic);
+      const prompt = GRANDMA_STORY_PROMPT_AR.replace('[Topic]', randomTopic);
 
       try {
-          await initializeChat("Sleep Story Session", prompt, undefined, language);
-          const stream = sendMessageStreamToGemini("Start story", language);
+          await initializeChat("Grandma Story Session", prompt, undefined, language);
+          const stream = sendMessageStreamToGemini("احكي لي الحدوته يا تيتا", language);
           for await (const chunk of stream) {
               setStoryText(prev => prev + chunk);
           }
       } catch (e) {
-          setStoryText("Error generating story.");
+          setStoryText("حدث خطأ بسيط.. حاولي مرة أخرى يا حبيبتي.");
       } finally {
           setIsGeneratingStory(false);
       }
   };
 
+  // --- ROBUST SPEECH ENGINE (CHUNKING) ---
+  const startReading = () => {
+      stopReading(); // Clear any existing
+      isCancelledRef.current = false;
+      
+      // Split text into manageable chunks (sentences) based on punctuation
+      // Matches sentence ending with punctuation or remaining text
+      const chunks = storyText.match(/[^.!?،؟\n]+[.!?،؟\n]*|.+/g) || [storyText];
+      speechQueueRef.current = chunks;
+      
+      setIsSpeaking(true);
+      playNextChunk();
+  };
+
+  const playNextChunk = () => {
+      if (isCancelledRef.current || speechQueueRef.current.length === 0) {
+          setIsSpeaking(false);
+          return;
+      }
+
+      const chunk = speechQueueRef.current.shift();
+      if (!chunk || !chunk.trim()) {
+          playNextChunk();
+          return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(chunk);
+      utterance.lang = language === 'ar' ? 'ar-EG' : 'en-US';
+      utterance.rate = 0.85; // Slow and comforting
+      utterance.pitch = 0.9; // Slightly lower
+
+      // Voice Selection Strategy
+      if (language === 'ar') {
+         const arVoice = voices.find(v => v.lang.includes('ar') && (v.name.includes('Google') || v.name.includes('Maged') || v.name.includes('Laila'))) || voices.find(v => v.lang.includes('ar'));
+         if (arVoice) utterance.voice = arVoice;
+      } else {
+         const enVoice = voices.find(v => v.lang.includes('en') && v.name.includes('Samantha')) || voices.find(v => v.lang.includes('en'));
+         if (enVoice) utterance.voice = enVoice;
+      }
+
+      utterance.onend = () => {
+          playNextChunk();
+      };
+      
+      utterance.onerror = (e) => {
+          console.error("TTS Error", e);
+          // Attempt next chunk anyway to recover
+          playNextChunk();
+      };
+
+      window.speechSynthesis.speak(utterance);
+  };
+
+  const stopReading = () => {
+      isCancelledRef.current = true;
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      speechQueueRef.current = [];
+  };
+
   const toggleSpeech = () => {
       if (isSpeaking) {
-          window.speechSynthesis.cancel();
-          setIsSpeaking(false);
+          stopReading();
       } else if (storyText) {
-          const utterance = new SpeechSynthesisUtterance(storyText);
-          utterance.lang = language === 'ar' ? 'ar-EG' : 'en-US';
-          utterance.rate = 0.8; // Slower for sleep
-          utterance.pitch = 0.9; // Lower/Warmer
-          
-          utterance.onend = () => setIsSpeaking(false);
-          window.speechSynthesis.speak(utterance);
-          setIsSpeaking(true);
+          startReading();
       }
   };
 
-  // Cleanup on unmount
-  React.useEffect(() => {
-      return () => {
-          window.speechSynthesis.cancel();
+  // MUSIC PLAYER LOGIC
+  useEffect(() => {
+      let interval: NodeJS.Timeout;
+      if (isPlaying && currentTrack) {
+          interval = setInterval(() => {
+              setTrackProgress(prev => {
+                  if (prev >= 100) {
+                      setIsPlaying(false);
+                      return 0;
+                  }
+                  return prev + 0.05; // Simulate 40 mins roughly
+              });
+          }, 1000);
       }
-  }, []);
+      return () => clearInterval(interval);
+  }, [isPlaying, currentTrack]);
 
   return (
     <div className="h-full bg-slate-950 flex flex-col pt-safe pb-safe animate-fadeIn text-white overflow-hidden relative">
@@ -97,7 +183,14 @@ const SleepSanctuary: React.FC<Props> = ({ onBack, language }) => {
 
       {/* Header */}
       <header className="px-4 py-4 z-10 flex items-center gap-3 border-b border-white/10 bg-black/20 backdrop-blur-md">
-         <button onClick={onBack} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors">
+         <button onClick={() => {
+             if (activeView !== 'menu') {
+                 stopReading(); 
+                 setIsPlaying(false);
+                 setActiveView('menu');
+             }
+             else onBack();
+         }} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors">
              {isRTL ? <ArrowRight size={24} /> : <ArrowLeft size={24} />}
          </button>
          <h1 className="text-xl font-bold flex items-center gap-2 text-indigo-100">
@@ -105,28 +198,69 @@ const SleepSanctuary: React.FC<Props> = ({ onBack, language }) => {
          </h1>
       </header>
 
-      {/* Tabs */}
-      <div className="flex p-4 gap-4 relative z-10">
-          <button 
-            onClick={() => setActiveTab('calculator')}
-            className={`flex-1 py-3 rounded-2xl flex items-center justify-center gap-2 transition-all border ${activeTab === 'calculator' ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-900/50' : 'bg-white/5 border-white/10 text-indigo-300 hover:bg-white/10'}`}
-          >
-              <Clock size={18} />
-              <span className="font-bold text-sm">{t.sleepCalculator}</span>
-          </button>
-          <button 
-            onClick={() => setActiveTab('story')}
-            className={`flex-1 py-3 rounded-2xl flex items-center justify-center gap-2 transition-all border ${activeTab === 'story' ? 'bg-purple-600 border-purple-500 text-white shadow-lg shadow-purple-900/50' : 'bg-white/5 border-white/10 text-indigo-300 hover:bg-white/10'}`}
-          >
-              <BookOpen size={18} />
-              <span className="font-bold text-sm">{t.bedtimeStory}</span>
-          </button>
-      </div>
-
       <main className="flex-1 overflow-y-auto p-6 relative z-10 no-scrollbar">
           
-          {/* CALCULATOR TAB */}
-          {activeTab === 'calculator' && (
+          {/* MENU VIEW */}
+          {activeView === 'menu' && (
+              <div className="space-y-4 animate-slideUp">
+                  
+                  {/* Sleep Calculator Card */}
+                  <button 
+                    onClick={() => setActiveView('calculator')}
+                    className="w-full bg-gradient-to-br from-indigo-900 to-blue-900 p-6 rounded-[2rem] border border-white/10 flex items-center justify-between shadow-lg group hover:scale-[1.02] transition-transform"
+                  >
+                      <div className="flex items-center gap-4">
+                          <div className="w-14 h-14 bg-indigo-800 rounded-2xl flex items-center justify-center text-indigo-200 shadow-inner">
+                              <Clock size={32} />
+                          </div>
+                          <div className="text-start">
+                              <h3 className="text-lg font-bold text-white">{t.sleepCalculator}</h3>
+                              <p className="text-xs text-indigo-200 opacity-70">{t.cyclesDesc}</p>
+                          </div>
+                      </div>
+                      <div className="bg-white/10 p-2 rounded-full group-hover:bg-white/20 transition-colors">
+                          {isRTL ? <ArrowLeft size={20} /> : <ArrowRight size={20} />}
+                      </div>
+                  </button>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Grandma Stories Card */}
+                      <button 
+                        onClick={() => setActiveView('stories')}
+                        className="bg-gradient-to-br from-purple-900 to-fuchsia-900 p-6 rounded-[2rem] border border-white/10 flex flex-col items-center justify-center text-center gap-4 shadow-lg group hover:scale-[1.02] transition-transform h-64"
+                      >
+                          <div className="w-20 h-20 bg-purple-800 rounded-full flex items-center justify-center text-purple-200 shadow-lg border-4 border-purple-700/50">
+                              <User size={40} />
+                          </div>
+                          <div>
+                              <h3 className="text-xl font-bold text-white mb-1">{t.grandmaTales}</h3>
+                              <p className="text-xs text-purple-200 opacity-80 max-w-[150px] mx-auto">
+                                  {language === 'ar' ? 'قصص دافئة بصوت الجدة المصرية' : 'Warm stories with Grandma\'s voice'}
+                              </p>
+                          </div>
+                      </button>
+
+                      {/* Music Card */}
+                      <button 
+                        onClick={() => setActiveView('music')}
+                        className="bg-gradient-to-br from-teal-900 to-emerald-900 p-6 rounded-[2rem] border border-white/10 flex flex-col items-center justify-center text-center gap-4 shadow-lg group hover:scale-[1.02] transition-transform h-64"
+                      >
+                          <div className="w-20 h-20 bg-teal-800 rounded-full flex items-center justify-center text-teal-200 shadow-lg border-4 border-teal-700/50">
+                              <Headphones size={40} />
+                          </div>
+                          <div>
+                              <h3 className="text-xl font-bold text-white mb-1">{t.sleepMusic}</h3>
+                              <p className="text-xs text-teal-200 opacity-80 max-w-[150px] mx-auto">
+                                  {language === 'ar' ? 'مقاطع موسيقية لمدة 40 دقيقة' : '40-minute relaxing tracks'}
+                              </p>
+                          </div>
+                      </button>
+                  </div>
+              </div>
+          )}
+
+          {/* CALCULATOR VIEW */}
+          {activeView === 'calculator' && (
               <div className="animate-slideUp space-y-8">
                   <div className="bg-white/5 backdrop-blur-md rounded-3xl p-6 border border-white/10 text-center">
                       <h2 className="text-indigo-200 mb-6 font-medium">{t.wakeUpTime}</h2>
@@ -148,7 +282,6 @@ const SleepSanctuary: React.FC<Props> = ({ onBack, language }) => {
 
                   {bedtimes.length > 0 && (
                       <div className="space-y-4 animate-fadeIn">
-                          <p className="text-center text-xs text-indigo-300 opacity-80">{t.cyclesDesc}</p>
                           <div className="grid grid-cols-1 gap-4">
                               {bedtimes.map((time, i) => (
                                   <div key={i} className="bg-gradient-to-r from-indigo-900/50 to-slate-900/50 p-4 rounded-2xl border border-white/10 flex justify-between items-center">
@@ -167,55 +300,58 @@ const SleepSanctuary: React.FC<Props> = ({ onBack, language }) => {
               </div>
           )}
 
-          {/* STORY TAB */}
-          {activeTab === 'story' && (
+          {/* STORIES VIEW */}
+          {activeView === 'stories' && (
               <div className="animate-slideUp flex flex-col h-full">
                    {!storyText && !isGeneratingStory ? (
-                       <div className="flex-1 flex flex-col items-center justify-center space-y-6">
-                           <div className="w-24 h-24 bg-purple-500/10 rounded-full flex items-center justify-center border border-purple-500/30 shadow-[0_0_30px_rgba(168,85,247,0.2)]">
-                               <Moon size={40} className="text-purple-300" />
+                       <div className="flex-1 flex flex-col items-center justify-center space-y-8 text-center">
+                           <div className="w-32 h-32 bg-purple-500/10 rounded-full flex items-center justify-center border border-purple-500/30 shadow-[0_0_50px_rgba(168,85,247,0.3)] animate-pulse">
+                               <Moon size={60} className="text-purple-300" />
                            </div>
-                           <div className="w-full max-w-sm space-y-4">
-                               <label className="text-sm text-indigo-300 block ml-2">{t.storyTopic}</label>
-                               <input 
-                                  type="text" 
-                                  value={storyTopic}
-                                  onChange={(e) => setStoryTopic(e.target.value)}
-                                  placeholder={t.storyTopicPlaceholder}
-                                  className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-white focus:ring-2 focus:ring-purple-500 outline-none"
-                               />
-                               <button 
-                                  onClick={generateStory}
-                                  disabled={!storyTopic.trim()}
-                                  className="w-full py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-2xl font-bold shadow-lg transition-all active:scale-95 disabled:opacity-50"
-                               >
-                                   {t.generateStory}
-                               </button>
+                           <div>
+                               <h2 className="text-2xl font-bold text-white mb-2">{t.grandmaTales}</h2>
+                               <p className="text-purple-200 max-w-xs mx-auto text-sm leading-relaxed">
+                                   {language === 'ar' 
+                                     ? 'استمع إلى حكايات ما قبل النوم بصوت "تيتا" المصرية الدافئ، لتهدئة عقلك وقلبك.' 
+                                     : 'Listen to bedtime stories with the warm voice of an Egyptian Grandma.'}
+                               </p>
                            </div>
+                           
+                           <button 
+                              onClick={handleGrandmaStory}
+                              className="w-full max-w-sm py-5 bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white rounded-[2rem] font-bold text-lg shadow-xl shadow-purple-900/40 hover:scale-105 transition-transform active:scale-95 flex items-center justify-center gap-3"
+                           >
+                               <Play size={24} fill="currentColor" />
+                               <span>{t.tellMeStory}</span>
+                           </button>
                        </div>
                    ) : (
                        <div className="flex-1 flex flex-col min-h-0">
+                           <h3 className="text-center text-purple-300 font-bold mb-4 flex items-center justify-center gap-2">
+                               <Stars size={16} /> {storyTitle || t.listeningStory}
+                           </h3>
+                           
                            <div className="flex-1 bg-white/5 backdrop-blur-md rounded-3xl p-8 border border-white/10 overflow-y-auto leading-loose text-lg text-indigo-100 shadow-inner relative mb-4">
                                {isGeneratingStory && !storyText && (
                                    <div className="absolute inset-0 flex items-center justify-center flex-col gap-4 text-purple-300">
-                                       <Stars size={32} className="animate-spin" />
+                                       <div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
                                        <span className="text-sm animate-pulse">{t.listeningStory}</span>
                                    </div>
                                )}
                                <p className="whitespace-pre-wrap font-serif opacity-90">{storyText}</p>
                            </div>
 
-                           <div className="flex gap-2">
+                           <div className="flex gap-3">
                                <button 
                                   onClick={toggleSpeech}
                                   disabled={!storyText || isGeneratingStory}
-                                  className={`flex-1 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${isSpeaking ? 'bg-red-500/20 text-red-300 border border-red-500/50' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}
+                                  className={`flex-1 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all ${isSpeaking ? 'bg-red-500/20 text-red-300 border border-red-500/50' : 'bg-purple-600 text-white hover:bg-purple-500'}`}
                                >
                                    {isSpeaking ? <StopCircle size={20} className="animate-pulse" /> : <Play size={20} />}
                                    <span>{isSpeaking ? (language === 'ar' ? 'إيقاف القراءة' : 'Stop Reading') : (language === 'ar' ? 'قراءة القصة' : 'Read Story')}</span>
                                </button>
                                <button 
-                                  onClick={() => { setStoryText(''); setStoryTopic(''); }}
+                                  onClick={() => { setStoryText(''); setStoryTitle(''); stopReading(); }}
                                   className="px-6 py-4 bg-white/10 rounded-2xl hover:bg-white/20 transition-colors"
                                >
                                    <X size={20} />
@@ -225,6 +361,71 @@ const SleepSanctuary: React.FC<Props> = ({ onBack, language }) => {
                    )}
               </div>
           )}
+
+          {/* MUSIC VIEW */}
+          {activeView === 'music' && (
+              <div className="animate-slideUp flex flex-col h-full">
+                  {!currentTrack ? (
+                      <>
+                          <h2 className="text-xl font-bold text-teal-100 mb-6 flex items-center gap-2">
+                              <Music size={20} /> {t.chooseTrack}
+                          </h2>
+                          <div className="space-y-3 overflow-y-auto pr-1">
+                              {SLEEP_MUSIC_TRACKS.map((track) => (
+                                  <button 
+                                    key={track.id}
+                                    onClick={() => { setCurrentTrack(track); setIsPlaying(true); }}
+                                    className="w-full bg-white/5 hover:bg-white/10 border border-white/10 p-4 rounded-2xl flex items-center justify-between group transition-all"
+                                  >
+                                      <div className="flex items-center gap-4">
+                                          <div className="w-10 h-10 bg-teal-900/50 rounded-full flex items-center justify-center text-teal-400 group-hover:scale-110 transition-transform">
+                                              <Play size={16} fill="currentColor" />
+                                          </div>
+                                          <div className="text-start">
+                                              <h3 className="font-bold text-white text-sm">{language === 'ar' ? track.titleAr : track.titleEn}</h3>
+                                              <p className="text-xs text-white/50">{track.duration} {t.minutes}</p>
+                                          </div>
+                                      </div>
+                                  </button>
+                              ))}
+                          </div>
+                      </>
+                  ) : (
+                      <div className="flex-1 flex flex-col items-center justify-center text-center">
+                          <div className="w-64 h-64 bg-teal-900/30 rounded-full flex items-center justify-center border-4 border-teal-500/20 mb-8 relative">
+                              {isPlaying && (
+                                  <>
+                                    <div className="absolute inset-0 border-4 border-teal-400/30 rounded-full animate-ping"></div>
+                                    <div className="absolute inset-0 border-4 border-teal-400/30 rounded-full animate-ping" style={{animationDelay: '1s'}}></div>
+                                  </>
+                              )}
+                              <Music size={80} className="text-teal-300 drop-shadow-lg relative z-10" />
+                          </div>
+                          
+                          <h2 className="text-2xl font-bold text-white mb-2">{language === 'ar' ? currentTrack.titleAr : currentTrack.titleEn}</h2>
+                          <p className="text-teal-200/60 text-sm mb-8">{t.nowPlaying} • 40:00</p>
+                          
+                          {/* Progress Bar */}
+                          <div className="w-full max-w-xs bg-white/10 h-2 rounded-full mb-12 overflow-hidden">
+                              <div className="bg-teal-500 h-full transition-all duration-1000 ease-linear" style={{ width: `${trackProgress}%` }}></div>
+                          </div>
+
+                          <div className="flex gap-6 items-center">
+                              <button onClick={() => { setCurrentTrack(null); setIsPlaying(false); setTrackProgress(0); }} className="p-4 bg-white/10 rounded-full hover:bg-white/20 transition-colors">
+                                  <X size={24} />
+                              </button>
+                              <button 
+                                onClick={() => setIsPlaying(!isPlaying)}
+                                className="p-6 bg-teal-500 text-white rounded-full shadow-lg shadow-teal-500/40 hover:scale-105 transition-transform active:scale-95"
+                              >
+                                  {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" />}
+                              </button>
+                          </div>
+                      </div>
+                  )}
+              </div>
+          )}
+
       </main>
     </div>
   );

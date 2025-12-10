@@ -15,10 +15,16 @@ const CategoryInfoModal: React.FC<Props> = ({ category, onClose, language }) => 
   const isRTL = language === 'ar';
   const title = t[`cat_${category.id}_title`] || category.id;
   const desc = t[`cat_${category.id}_desc`] || '';
+  
+  // Use specific science description if available, otherwise fallback to generic based on language
+  const science = t[`cat_${category.id}_science`] || (language === 'ar' 
+    ? 'يعتمد هذا القسم على بروتوكولات العلاج المعرفي السلوكي (CBT) وتقنيات اليقظة الذهنية المعتمدة عالمياً.' 
+    : 'This section utilizes Cognitive Behavioral Therapy (CBT) protocols and globally recognized mindfulness techniques.');
 
   // Robust gradient generation using explicit classes to ensure Tailwind compiles them
   const getGradient = () => {
     if (category.color.includes('rose')) return 'from-rose-500 to-pink-600';
+    if (category.color.includes('red')) return 'from-red-500 to-rose-600';
     if (category.color.includes('teal')) return 'from-teal-500 to-emerald-600';
     if (category.color.includes('blue')) return 'from-sky-500 to-blue-600';
     if (category.color.includes('orange')) return 'from-orange-500 to-amber-600';
@@ -75,9 +81,7 @@ const CategoryInfoModal: React.FC<Props> = ({ category, onClose, language }) => 
                         {language === 'ar' ? 'الأساس العلمي' : 'Scientific Basis'}
                     </h4>
                     <p className="text-xs text-gray-500 leading-relaxed">
-                        {language === 'ar' 
-                            ? 'يعتمد هذا القسم على بروتوكولات العلاج المعرفي السلوكي (CBT) وتقنيات اليقظة الذهنية المعتمدة عالمياً.' 
-                            : 'This section utilizes Cognitive Behavioral Therapy (CBT) protocols and globally recognized mindfulness techniques.'}
+                        {science}
                     </p>
                 </div>
             </div>

@@ -1,10 +1,13 @@
 
+
+
+
 import React, { useState, useEffect } from 'react';
 import { User, Achievement, MonthlyReport, Language, TherapyPlan, JournalEntry, SavedMessage, SessionSummary, BookedSession } from '../types';
 import { translations } from '../translations';
 import { ACHIEVEMENTS, MOCK_REPORTS } from '../constants';
 import * as Icons from 'lucide-react';
-import { ArrowRight, ArrowLeft, Download, Copy, Sprout, TrendingUp, Trophy, Activity, CheckCircle, Brain, Target, Clock, Hourglass, BookOpen, PenTool, Check, Bookmark, HeartHandshake, Link as LinkIcon, History, Edit2, Save, X, Trash2, CalendarCheck, MapPin, RefreshCw } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Download, Copy, Sprout, TrendingUp, Trophy, Activity, CheckCircle, Brain, Target, Clock, Hourglass, BookOpen, PenTool, Check, Bookmark, HeartHandshake, Link as LinkIcon, History, Edit2, Save, X, Trash2, CalendarCheck, MapPin, RefreshCw, ChevronRight, ChevronLeft } from 'lucide-react';
 import { realtimeService } from '../services/realtimeService';
 import { syncService } from '../services/syncService';
 
@@ -14,9 +17,10 @@ interface Props {
   language: Language;
   onUpdateUser: (updatedUser: User) => void;
   onReschedule?: (session: BookedSession) => void;
+  onViewJournal?: () => void; // New Prop
 }
 
-const ProfilePage: React.FC<Props> = ({ user, onBack, language, onUpdateUser, onReschedule }) => {
+const ProfilePage: React.FC<Props> = ({ user, onBack, language, onUpdateUser, onReschedule, onViewJournal }) => {
   const t = translations[language] as any;
   const isRTL = language === 'ar';
   const [activeTab, setActiveTab] = useState<'overview' | 'reports' | 'saved' | 'timeline'>('overview');
@@ -426,7 +430,8 @@ const ProfilePage: React.FC<Props> = ({ user, onBack, language, onUpdateUser, on
                           <div className="grid grid-cols-4 gap-2">
                               {ACHIEVEMENTS.map((ach) => (
                                   <div key={ach.id} className={`aspect-square rounded-2xl flex flex-col items-center justify-center p-2 text-center transition-all ${ach.unlocked ? 'bg-amber-100 text-amber-600 shadow-sm' : 'bg-gray-100 text-gray-300 grayscale opacity-60'}`}>
-                                      <div className="text-xl mb-1">{React.createElement((Icons as any)[ach.icon], { size: 20 })}</div>
+                                      {/* FIXED: Add fallback for missing achievement icon to prevent crash */}
+                                      <div className="text-xl mb-1">{React.createElement((Icons as any)[ach.icon] || Icons.Flag, { size: 20 })}</div>
                                       <div className="text-[8px] font-bold leading-tight">{language === 'ar' ? ach.titleAr : ach.titleEn}</div>
                                   </div>
                               ))}
@@ -434,27 +439,21 @@ const ProfilePage: React.FC<Props> = ({ user, onBack, language, onUpdateUser, on
                           <ProgressGraph />
                       </div>
 
-                      {/* Journal */}
+                      {/* Journal - MODIFIED TO LINK TO FULL PAGE */}
                       <div className="bg-white/40 backdrop-blur-2xl rounded-[2rem] p-6 border border-white/40 shadow-sm relative overflow-hidden">
                           <h3 className="text-gray-800 font-bold mb-4 flex items-center gap-2">
                               <BookOpen size={20} className="text-pink-500" />
                               {t.journalTitle}
                           </h3>
                           <div className="relative">
-                              <textarea 
-                                  value={journalText}
-                                  onChange={(e) => setJournalText(e.target.value)}
-                                  placeholder={t.journalPlaceholder}
-                                  className="w-full h-32 bg-white/50 border border-white/60 rounded-2xl p-4 text-sm resize-none focus:ring-2 focus:ring-pink-200 outline-none transition-all placeholder-gray-400"
-                              ></textarea>
-                              <div className="flex justify-end mt-2">
+                              <div className="bg-white/50 border border-white/60 rounded-2xl p-6 text-center">
+                                  <p className="text-gray-500 text-sm mb-4">{t.journalPlaceholder}</p>
                                   <button 
-                                      onClick={handleSaveJournal}
-                                      disabled={!journalText.trim()}
-                                      className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${isJournalSaved ? 'bg-green-500 text-white' : 'bg-pink-500 text-white hover:bg-pink-600 shadow-lg shadow-pink-500/30'}`}
+                                      onClick={onViewJournal}
+                                      className="px-6 py-3 rounded-xl text-sm font-bold bg-pink-500 text-white hover:bg-pink-600 shadow-lg shadow-pink-500/30 w-full flex items-center justify-center gap-2 transition-all"
                                   >
-                                      {isJournalSaved ? <Check size={14} /> : <PenTool size={14} />}
-                                      {isJournalSaved ? t.journalSaved : t.analyze}
+                                      {t.viewJournal}
+                                      {isRTL ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
                                   </button>
                               </div>
                           </div>

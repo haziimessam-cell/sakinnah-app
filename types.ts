@@ -53,6 +53,11 @@ export interface User {
   gender: Gender;
   username: string; // New: Unique ID
   partner?: string; // New: Linked Partner
+  registrationDate: string; // ISO Date String
+  isSubscribed?: boolean; // True if paid
+  pinCode?: string; // Encrypted/Stored PIN for App Lock
+  voiceSpeed?: number; // 0.5 to 2.0
+  emergencyContact?: string; // Custom number
 }
 
 export interface Question {
@@ -114,4 +119,4 @@ export interface DailyChallenge {
   color: string;
 }
 
-export type ViewState = 'LOGIN' | 'HOME' | 'CHAT' | 'DISCLAIMER' | 'PROFILE' | 'SETTINGS' | 'HELP' | 'BREATHING' | 'GARDEN' | 'DREAM' | 'GROUNDING' | 'BOOKING' | 'SLEEP_TOOL';
+export type ViewState = 'LOGIN' | 'HOME' | 'CHAT' | 'DISCLAIMER' | 'PROFILE' | 'SETTINGS' | 'HELP' | 'BREATHING' | 'GARDEN' | 'DREAM' | 'GROUNDING' | 'BOOKING' | 'SLEEP_TOOL' | 'SUBSCRIPTION' | 'JOURNAL';

@@ -2,8 +2,9 @@
 import React, { useRef, useState } from 'react';
 import { User, Language } from '../types';
 import { translations } from '../translations';
-import { ArrowRight, ArrowLeft, Bell, Moon, Trash2, Shield, LogOut, Globe, Download, Cloud, Upload, FileJson, CheckCircle } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Bell, Trash2, Shield, LogOut, Globe, Download, Cloud, Upload, Lock, ShieldCheck, ToggleLeft, ToggleRight, Mic, Phone } from 'lucide-react';
 import { syncService } from '../services/syncService';
+import PinLock from './PinLock';
 
 interface Props {
   user: User;
@@ -19,6 +20,10 @@ const SettingsPage: React.FC<Props> = ({ user, onBack, onLogout, language, setLa
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isRestoring, setIsRestoring] = useState(false);
   const [lastBackup, setLastBackup] = useState<Date | null>(null);
+  
+  // PIN Logic
+  const [showPinSetup, setShowPinSetup] = useState(false);
+  const [pinMode, setPinMode] = useState<'setup' | 'disable'>('setup');
 
   const handleClearData = () => {
       if(window.confirm(t.confirmClear)) {
@@ -39,7 +44,6 @@ const SettingsPage: React.FC<Props> = ({ user, onBack, onLogout, language, setLa
       }
   };
 
-  // Enhanced Backup (File)
   const handleBackup = () => {
       const blob = syncService.createBackup();
       const url = URL.createObjectURL(blob);
@@ -52,7 +56,6 @@ const SettingsPage: React.FC<Props> = ({ user, onBack, onLogout, language, setLa
       setLastBackup(new Date());
   };
 
-  // Restore
   const handleRestoreClick = () => {
       fileInputRef.current?.click();
   };
@@ -75,8 +78,51 @@ const SettingsPage: React.FC<Props> = ({ user, onBack, onLogout, language, setLa
       }
   };
 
+  // PIN Handlers
+  const handlePinAction = () => {
+      if (user.pinCode) {
+          setPinMode('disable');
+          setShowPinSetup(true);
+      } else {
+          setPinMode('setup');
+          setShowPinSetup(true);
+      }
+  };
+
+  const handlePinSuccess = (pin: string) => {
+      let updatedUser = { ...user };
+      if (pinMode === 'setup') {
+          updatedUser.pinCode = pin;
+          alert(t.pinSetupSuccess);
+      } else {
+          delete updatedUser.pinCode;
+          alert(t.pinRemoveSuccess);
+      }
+      localStorage.setItem('sakinnah_user', JSON.stringify(updatedUser));
+      setShowPinSetup(false);
+      window.location.reload();
+  };
+
+  const handleUpdateSetting = (key: string, value: any) => {
+      const updatedUser = { ...user, [key]: value };
+      localStorage.setItem('sakinnah_user', JSON.stringify(updatedUser));
+      // In a real app we'd bubble this up, but for now reload to apply global context
+      // Or just assume local state update is sufficient for this view
+  };
+
   return (
     <div className="h-full bg-transparent flex flex-col pt-safe pb-safe animate-fadeIn">
+      
+      {showPinSetup && (
+          <PinLock 
+            mode={pinMode} 
+            language={language} 
+            onSuccess={handlePinSuccess} 
+            onCancel={() => setShowPinSetup(false)}
+            storedPin={user.pinCode}
+          />
+      )}
+
       <header className="bg-white/40 backdrop-blur-xl px-4 py-4 shadow-sm sticky top-0 z-10 flex items-center gap-3 border-b border-white/20">
          <button onClick={onBack} className="p-2 hover:bg-white/60 rounded-full transition-colors border border-transparent hover:border-white/40">
              {isRTL ? <ArrowRight size={24} className="text-gray-600" /> : <ArrowLeft size={24} className="text-gray-600" />}
@@ -103,7 +149,6 @@ const SettingsPage: React.FC<Props> = ({ user, onBack, onLogout, language, setLa
                   </div>
               </div>
 
-              {/* Sync Action */}
               <div className="mt-4 pt-4 border-t border-white/20 flex justify-between items-center">
                    <div className="text-xs text-blue-100">
                        {language === 'ar' ? 'الحالة: نشط' : 'Status: Active'}
@@ -115,7 +160,58 @@ const SettingsPage: React.FC<Props> = ({ user, onBack, onLogout, language, setLa
           </div>
 
           <div className="bg-white/60 backdrop-blur-2xl rounded-2xl shadow-sm border border-white/50 overflow-hidden">
-               {/* Language Setting */}
+               {/* Personalization Header */}
+               <div className="p-4 border-b border-gray-100/50 bg-gray-50/50">
+                   <h3 className="text-sm font-bold text-gray-500">{t.personalization}</h3>
+               </div>
+
+               {/* Voice Speed */}
+               <div className="p-4 border-b border-gray-100/50">
+                   <div className="flex items-center gap-3 mb-3">
+                       <div className="w-10 h-10 bg-purple-50/80 rounded-full flex items-center justify-center text-purple-600">
+                           <Mic size={20} />
+                       </div>
+                       <div className="flex-1">
+                           <h3 className="font-bold text-gray-800">{t.voiceSpeed}</h3>
+                       </div>
+                       <span className="text-sm font-bold text-purple-600">{user.voiceSpeed || 1.0}x</span>
+                   </div>
+                   <input 
+                      type="range" 
+                      min="0.5" 
+                      max="1.5" 
+                      step="0.1" 
+                      defaultValue={user.voiceSpeed || 1.0}
+                      onChange={(e) => handleUpdateSetting('voiceSpeed', parseFloat(e.target.value))}
+                      className="w-full accent-purple-600 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                   />
+                   <div className="flex justify-between text-[10px] text-gray-400 mt-1 px-1">
+                       <span>{language === 'ar' ? 'بطيء' : 'Slow'}</span>
+                       <span>{language === 'ar' ? 'طبيعي' : 'Normal'}</span>
+                       <span>{language === 'ar' ? 'سريع' : 'Fast'}</span>
+                   </div>
+               </div>
+
+               {/* Emergency Contact */}
+               <div className="p-4 border-b border-gray-100/50">
+                   <div className="flex items-center gap-3 mb-3">
+                       <div className="w-10 h-10 bg-red-50/80 rounded-full flex items-center justify-center text-red-500">
+                           <Phone size={20} />
+                       </div>
+                       <div className="flex-1">
+                           <h3 className="font-bold text-gray-800">{t.emergencyContact}</h3>
+                       </div>
+                   </div>
+                   <input 
+                      type="tel"
+                      placeholder={t.emergencyContactPlaceholder}
+                      defaultValue={user.emergencyContact || ''}
+                      onBlur={(e) => handleUpdateSetting('emergencyContact', e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-red-100 outline-none transition-all"
+                   />
+               </div>
+
+               {/* Language */}
                <div className="p-4 border-b border-gray-100/50 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-teal-50/80 rounded-full flex items-center justify-center text-teal-600">
@@ -133,6 +229,7 @@ const SettingsPage: React.FC<Props> = ({ user, onBack, onLogout, language, setLa
                   </button>
               </div>
 
+              {/* Notifications */}
               <div className="p-4 border-b border-gray-100/50 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-blue-50/80 rounded-full flex items-center justify-center text-blue-600">
@@ -148,13 +245,28 @@ const SettingsPage: React.FC<Props> = ({ user, onBack, onLogout, language, setLa
                     <div className="w-11 h-6 bg-gray-200/80 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
                   </label>
               </div>
+
+              {/* Security PIN Lock */}
+              <div className="p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${user.pinCode ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                          {user.pinCode ? <ShieldCheck size={20} /> : <Lock size={20} />}
+                      </div>
+                      <div>
+                          <h3 className="font-bold text-gray-800">{t.appLock}</h3>
+                          <p className="text-xs text-gray-500">{user.pinCode ? (language === 'ar' ? 'مفعل' : 'Enabled') : (language === 'ar' ? 'غير مفعل' : 'Disabled')}</p>
+                      </div>
+                  </div>
+                  <button onClick={handlePinAction} className={`p-2 rounded-xl transition-colors ${user.pinCode ? 'bg-red-50 text-red-500 hover:bg-red-100' : 'bg-primary-50 text-primary-600 hover:bg-primary-100'}`}>
+                      {user.pinCode ? (isRTL ? <ToggleRight size={24} /> : <ToggleRight size={24} />) : (isRTL ? <ToggleLeft size={24} className="text-gray-400" /> : <ToggleLeft size={24} className="text-gray-400" />)}
+                  </button>
+              </div>
           </div>
 
           <div className="bg-white/60 backdrop-blur-2xl rounded-2xl shadow-sm border border-white/50 overflow-hidden">
              <div className="p-4 border-b border-gray-100/50">
                   <h3 className="text-sm font-bold text-gray-500 mb-4">{t.privacyData}</h3>
                   
-                  {/* BACKUP BUTTON */}
                   <button onClick={handleBackup} className="w-full flex items-center justify-between py-3 group mb-2 hover:bg-white/40 rounded-xl transition-colors px-2">
                       <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-emerald-50/80 rounded-lg flex items-center justify-center text-emerald-500 group-hover:bg-emerald-100 transition-colors">
@@ -171,7 +283,6 @@ const SettingsPage: React.FC<Props> = ({ user, onBack, onLogout, language, setLa
                       </div>
                   </button>
                   
-                  {/* RESTORE BUTTON */}
                   <button onClick={handleRestoreClick} className="w-full flex items-center justify-between py-3 group mb-2 hover:bg-white/40 rounded-xl transition-colors px-2">
                       <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-amber-50/80 rounded-lg flex items-center justify-center text-amber-500 group-hover:bg-amber-100 transition-colors">
@@ -216,7 +327,7 @@ const SettingsPage: React.FC<Props> = ({ user, onBack, onLogout, language, setLa
               {t.logout}
           </button>
           
-          <div className="text-center text-xs text-gray-400 mt-4 font-mono">v3.0.0 (Cloud Ready)</div>
+          <div className="text-center text-xs text-gray-400 mt-4 font-mono">v3.1.0 (Secure Edition)</div>
       </main>
     </div>
   );

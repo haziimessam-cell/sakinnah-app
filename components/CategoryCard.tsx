@@ -23,6 +23,7 @@ const CategoryCard: React.FC<Props> = ({ category, onClick, onInfo, index, langu
   // Robust gradient mapping - returns specific classes for background and shadow
   const getStyle = () => {
       if (category.color.includes('rose')) return { bg: 'from-rose-500 to-pink-600', shadow: 'shadow-rose-300/50', glow: 'bg-rose-500' };
+      if (category.color.includes('red')) return { bg: 'from-red-500 to-rose-600', shadow: 'shadow-red-300/50', glow: 'bg-red-500' };
       if (category.color.includes('teal')) return { bg: 'from-teal-500 to-emerald-600', shadow: 'shadow-teal-300/50', glow: 'bg-teal-500' };
       if (category.color.includes('blue')) return { bg: 'from-sky-500 to-blue-600', shadow: 'shadow-blue-300/50', glow: 'bg-blue-500' };
       if (category.color.includes('orange')) return { bg: 'from-orange-500 to-amber-600', shadow: 'shadow-orange-300/50', glow: 'bg-orange-500' };
@@ -43,18 +44,6 @@ const CategoryCard: React.FC<Props> = ({ category, onClick, onInfo, index, langu
       style={{ animationDelay: `${index * 60}ms` }}
       className="relative flex flex-col items-center justify-center h-40 bg-white/60 backdrop-blur-xl rounded-[2.5rem] shadow-lg hover:shadow-2xl transition-all duration-500 group active:scale-[0.96] animate-slideUp opacity-0 overflow-hidden border border-white/40 cursor-pointer"
     >
-      {/* INFO BUTTON */}
-      <button 
-        onClick={(e) => {
-            e.stopPropagation();
-            onInfo(category);
-        }}
-        className="absolute top-3 right-3 z-20 w-8 h-8 bg-white/40 hover:bg-white rounded-full flex items-center justify-center text-gray-500 hover:text-primary-600 backdrop-blur-md border border-white/30 transition-all shadow-sm active:scale-90"
-        title="Info"
-      >
-          <Info size={16} />
-      </button>
-
       {/* Internal Glass Reflection */}
       <div className="absolute top-0 left-0 right-0 h-2/3 bg-gradient-to-b from-white/50 to-transparent pointer-events-none"></div>
       
@@ -62,13 +51,26 @@ const CategoryCard: React.FC<Props> = ({ category, onClick, onInfo, index, langu
       <div className={`absolute -bottom-8 -right-8 w-28 h-28 ${style.glow} rounded-full opacity-30 blur-2xl group-hover:opacity-50 transition-all duration-700 group-hover:scale-125`}></div>
       
       {/* Icon Container - Floating Jewel */}
-      <div className={`w-16 h-16 bg-gradient-to-br ${style.bg} rounded-2xl flex items-center justify-center text-white mb-4 shadow-xl ${style.shadow} transform group-hover:-translate-y-2 group-hover:scale-110 transition-all duration-500 relative z-10 border border-white/20`}>
+      <div className={`w-16 h-16 bg-gradient-to-br ${style.bg} rounded-2xl flex items-center justify-center text-white mb-3 shadow-xl ${style.shadow} transform group-hover:-translate-y-2 group-hover:scale-110 transition-all duration-500 relative z-10 border border-white/20`}>
         <IconComponent size={30} strokeWidth={2.5} className="drop-shadow-md" />
         {/* Shine on Icon */}
         <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/30 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
       </div>
       
-      <h3 className="text-gray-800 font-bold text-sm text-center relative z-10 px-3 leading-tight group-hover:text-black transition-colors">{title}</h3>
+      {/* Title & Info Row - Info Icon Inline Next to Title */}
+      <div className="relative z-10 px-2 flex items-center justify-center gap-1.5 w-full">
+          <h3 className="text-gray-800 font-bold text-xs md:text-sm text-center leading-tight group-hover:text-black transition-colors line-clamp-1">{title}</h3>
+          <button 
+            onClick={(e) => {
+                e.stopPropagation();
+                onInfo(category);
+            }}
+            className="w-5 h-5 bg-white/50 hover:bg-white rounded-full flex items-center justify-center text-gray-500 hover:text-primary-600 backdrop-blur-md border border-white/30 transition-all shadow-sm active:scale-90 flex-shrink-0"
+            title="Info"
+          >
+              <Info size={12} />
+          </button>
+      </div>
       
       {/* Shine Effect on Hover */}
       <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/40 to-transparent -translate-x-[150%] group-hover:translate-x-[150%] transition-transform duration-1000 ease-in-out pointer-events-none skew-x-12"></div>

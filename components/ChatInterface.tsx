@@ -5,8 +5,8 @@ import { translations } from '../translations';
 import { sendMessageStreamToGemini, initializeChat } from '../services/geminiService';
 import { ragService } from '../services/ragService';
 import { syncService } from '../services/syncService';
-import { CATEGORY_QUESTIONS, BARAEM_SYSTEM_INSTRUCTION_AR, BARAEM_SYSTEM_INSTRUCTION_EN, RELATIONSHIPS_SYSTEM_INSTRUCTION_AR, RELATIONSHIPS_SYSTEM_INSTRUCTION_EN, SLEEP_CHAT_SYSTEM_INSTRUCTION_AR, SLEEP_CHAT_SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_AR, SYSTEM_INSTRUCTION_EN, SUMMARY_PROMPT_AR, SUMMARY_PROMPT_EN } from '../constants';
-import { ArrowRight, ArrowLeft, Phone, LogOut, Sparkles, Sprout, Clock, CalendarCheck, ChevronLeft, ChevronRight, CheckCircle } from 'lucide-react';
+import { CATEGORY_QUESTIONS, BARAEM_SYSTEM_INSTRUCTION_AR, BARAEM_SYSTEM_INSTRUCTION_EN, RELATIONSHIPS_SYSTEM_INSTRUCTION_AR, RELATIONSHIPS_SYSTEM_INSTRUCTION_EN, SLEEP_CHAT_SYSTEM_INSTRUCTION_AR, SLEEP_CHAT_SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_AR, SYSTEM_INSTRUCTION_EN } from '../constants';
+import { ArrowRight, ArrowLeft, Phone, LogOut, Sparkles, Clock, CheckCircle, ChevronDown } from 'lucide-react';
 import { Content } from '@google/genai';
 
 // Imported Sub-Components (Clean Architecture)
@@ -68,10 +68,12 @@ const ChatInterface: React.FC<Props> = ({ category, onBack, userGender, language
   const [recommendedPlan, setRecommendedPlan] = useState<TherapyPlan | null>(null);
   const [totalScore, setTotalScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
-  const [chatPersona, setChatPersona] = useState<'parent' | 'child'>('parent');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  
+  // UX State
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
   // Assessment Logic
   const hasHistory = messages.length > 0;
@@ -84,10 +86,12 @@ const ChatInterface: React.FC<Props> = ({ category, onBack, userGender, language
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const synth = window.speechSynthesis;
   const isCallModeRef = useRef(isCallMode);
   const isListeningRef = useRef(isListening);
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // --- EFFECT: VOICE LOADING ---
   useEffect(() => {
@@ -99,8 +103,20 @@ const ChatInterface: React.FC<Props> = ({ category, onBack, userGender, language
       if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = loadVoices;
   }, []);
 
-  // --- EFFECT: PERSISTENCE ---
-  useEffect(() => { localStorage.setItem(storageKey, JSON.stringify(messages)); }, [messages, storageKey]);
+  // --- EFFECT: PERSISTENCE & CLOUD SYNC ---
+  useEffect(() => { 
+      // Save Local
+      localStorage.setItem(storageKey, JSON.stringify(messages));
+      
+      // Auto-Sync to Cloud (Debounced)
+      if (messages.length > 0 && !isStreaming) {
+          if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+          syncTimeoutRef.current = setTimeout(() => {
+              syncService.saveChatSession(category.id, messages);
+          }, 3000); // Sync 3 seconds after last update to prevent spamming
+      }
+  }, [messages, storageKey, category.id, isStreaming]);
+
   useEffect(() => { isCallModeRef.current = isCallMode; }, [isCallMode]);
   useEffect(() => { isListeningRef.current = isListening; }, [isListening]);
 
@@ -142,8 +158,28 @@ const ChatInterface: React.FC<Props> = ({ category, onBack, userGender, language
     return () => clearInterval(interval);
   }, [isAssessmentMode, showRecommendation, timeLeft]);
 
-  // --- EFFECT: SCROLL TO BOTTOM ---
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isStreaming, suggestions]);
+  // --- SCROLL HANDLING ---
+  const scrollToBottom = () => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      setShowScrollButton(false);
+  };
+
+  const handleScroll = () => {
+      if (!containerRef.current) return;
+      const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+      const isBottom = scrollHeight - scrollTop - clientHeight < 100;
+      setShowScrollButton(!isBottom);
+  };
+
+  // Auto-scroll logic: Only auto-scroll if already near bottom
+  useEffect(() => { 
+      if (!containerRef.current) return;
+      const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+      const isBottom = scrollHeight - scrollTop - clientHeight < 150;
+      if (isBottom || messages.length === 1) {
+          scrollToBottom();
+      }
+  }, [messages, isStreaming, suggestions]);
 
   // --- EFFECT: SUGGESTIONS ---
   useEffect(() => {
@@ -237,12 +273,22 @@ const ChatInterface: React.FC<Props> = ({ category, onBack, userGender, language
 
   const detectEmotion = (text: string) => {
       const t = text.toLowerCase();
-      if (['sorry', 'understand', 'feel you'].some(k => t.includes(k))) return 'empathetic';
-      if (['sad', 'pain', 'lonely'].some(k => t.includes(k))) return 'sad';
-      if (['happy', 'great', 'proud'].some(k => t.includes(k))) return 'happy';
-      if (['wow', 'excited'].some(k => t.includes(k))) return 'excited';
-      if (['breathe', 'relax', 'calm'].some(k => t.includes(k))) return 'calm';
-      if (['plan', 'focus', 'must'].some(k => t.includes(k))) return 'serious';
+      
+      // Joy/Excitement (High Pitch, Fast Rate)
+      if (['wow', 'amazing', 'great', 'congrats', 'excited', 'yay', 'happy', 'wonderful', 'مذهل', 'رائع', 'ممتاز', 'مبروك', 'يا سلام'].some(k => t.includes(k))) return 'excited';
+      
+      // Empathy/Sadness (Low Pitch, Slow Rate)
+      if (['sorry', 'understand', 'feel you', 'pain', 'hard', 'grief', 'sad', 'struggle', 'أسف', 'حاسس بيك', 'صعب', 'ألم', 'حزن', 'سلامة قلبك'].some(k => t.includes(k))) return 'empathetic';
+      
+      // Reassurance/Calm (Normal Pitch, Slow Rate, Soft)
+      if (['don\'t worry', 'calm', 'breathe', 'relax', 'safe', 'fine', 'okay', 'هدي', 'اطمن', 'متخافش', 'بخير', 'أمان', 'أنا جنبك'].some(k => t.includes(k))) return 'reassuring';
+      
+      // Curiosity (Rising intonation simulated by slightly higher pitch)
+      if (t.includes('?') || ['what', 'why', 'how', 'tell me', 'share', 'ماذا', 'لماذا', 'كيف', 'احكيلي', 'قولي'].some(k => t.includes(k))) return 'curious';
+      
+      // Serious/Authoritative (Lower Pitch, Normal Rate)
+      if (['plan', 'focus', 'must', 'step', 'goal', 'important', 'listen', 'خطة', 'ركز', 'لازم', 'مهم', 'اسمعني', 'نصيحة'].some(k => t.includes(k))) return 'serious';
+      
       return 'neutral';
   };
 
@@ -262,28 +308,72 @@ const ChatInterface: React.FC<Props> = ({ category, onBack, userGender, language
     let basePitch = 1.0; 
     let baseRate = 1.0;
     const targetVoiceGender = userGender === 'male' ? 'female' : 'male';
+    const userSpeedMultiplier = user?.voiceSpeed || 1.0; // Apply User Preference
     
+    // Base Identity Tuning
     if (targetVoiceGender === 'female') {
-        if (selectedVoice?.name.includes('Maged')) { basePitch = 1.4; baseRate = 0.95; } 
-        else { basePitch = 1.1; baseRate = 0.9; }
-    } else { basePitch = 0.85; baseRate = 0.95; }
-
-    if (isIOS) { baseRate = baseRate * 0.9; if (language === 'ar') baseRate = 0.8; }
-
-    switch (emotion) {
-        case 'empathetic': utterance.pitch = basePitch - 0.05; utterance.rate = baseRate * 0.9; break;
-        case 'sad': utterance.pitch = basePitch - 0.1; utterance.rate = baseRate * 0.85; break;
-        case 'happy': utterance.pitch = basePitch + 0.1; utterance.rate = baseRate * 1.1; break;
-        case 'excited': utterance.pitch = basePitch + 0.15; utterance.rate = baseRate * 1.15; break;
-        case 'calm': utterance.pitch = basePitch - 0.05; utterance.rate = baseRate * 0.85; break;
-        case 'serious': utterance.pitch = basePitch - 0.1; utterance.rate = baseRate * 0.95; break;
-        default: utterance.pitch = basePitch; utterance.rate = baseRate;
+        if (selectedVoice?.name.includes('Maged')) { 
+            // If forcing male voice to sound female (iOS fallback)
+            basePitch = 1.4; baseRate = 0.95; 
+        } else { 
+            // Natural female voice
+            basePitch = 1.1; baseRate = 0.95; 
+        }
+    } else { 
+        // Male Identity
+        basePitch = 0.9; baseRate = 0.95; 
     }
-    utterance.volume = 1.0;
+
+    if (isIOS) { 
+        baseRate = baseRate * 0.9; 
+        if (language === 'ar') baseRate = 0.85; 
+    }
+
+    // Apply User Speed Setting
+    baseRate = baseRate * userSpeedMultiplier;
+
+    // Dynamic Emotion Modulation
+    switch (emotion) {
+        case 'empathetic': 
+            utterance.pitch = basePitch - 0.2; 
+            utterance.rate = baseRate * 0.8; // Very slow
+            utterance.volume = 0.8; // Soft
+            break;
+        case 'reassuring':
+            utterance.pitch = basePitch - 0.1;
+            utterance.rate = baseRate * 0.85; // Slow and steady
+            utterance.volume = 0.9;
+            break;
+        case 'excited': 
+            utterance.pitch = basePitch + 0.2; 
+            utterance.rate = baseRate * 1.15; // Faster
+            utterance.volume = 1.0;
+            break;
+        case 'curious':
+            utterance.pitch = basePitch + 0.1; 
+            utterance.rate = baseRate * 1.05;
+            break;
+        case 'serious': 
+            utterance.pitch = basePitch - 0.3; // Deeper
+            utterance.rate = baseRate * 0.9; 
+            utterance.volume = 1.0; // Clear
+            break;
+        default: 
+            utterance.pitch = basePitch; 
+            utterance.rate = baseRate;
+    }
+    
     utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => { if (!synth.speaking) { setIsSpeaking(false); if (isCallModeRef.current && recognitionRef.current) { try { recognitionRef.current.start(); setIsListening(true); } catch(e) {} } } };
+    utterance.onend = () => { 
+        if (!synth.speaking) { 
+            setIsSpeaking(false); 
+            if (isCallModeRef.current && recognitionRef.current) { 
+                try { recognitionRef.current.start(); setIsListening(true); } catch(e) {} 
+            } 
+        } 
+    };
     synth.speak(utterance);
-  }, [language, userGender, availableVoices]);
+  }, [language, userGender, availableVoices, user?.voiceSpeed]);
 
   // --- ACTIONS ---
   const handleSend = async (overrideText?: string) => {
@@ -337,10 +427,20 @@ const ChatInterface: React.FC<Props> = ({ category, onBack, userGender, language
         else if (category.id === 'relationships') baseInstr = language === 'ar' ? RELATIONSHIPS_SYSTEM_INSTRUCTION_AR : RELATIONSHIPS_SYSTEM_INSTRUCTION_EN;
         else if (category.id === 'sleep') baseInstr = language === 'ar' ? SLEEP_CHAT_SYSTEM_INSTRUCTION_AR : SLEEP_CHAT_SYSTEM_INSTRUCTION_EN;
         
+        // Retrieve Therapy Plan from storage to inject
+        const savedPlanStr = localStorage.getItem(planKey);
+        let therapyPlanSummary = "No current plan.";
+        if (savedPlanStr) {
+            const plan: TherapyPlan = JSON.parse(savedPlanStr);
+            therapyPlanSummary = `Category: ${plan.category}, Severity: ${plan.severity}, Focus: ${plan.focusArea}`;
+        }
+
         baseInstr = baseInstr
             .replace('[UserName]', user?.name || 'User')
             .replace('[UserAge]', user?.age || 'Unknown')
             .replace('[UserGender]', user?.gender || 'Unknown')
+            .replace('[UserMood]', lastMood || 'Unknown')
+            .replace('[TherapyPlan]', therapyPlanSummary)
             .replace('[CurrentTime]', new Date().toLocaleTimeString())
             .replace('[PartnerName]', user?.partner || 'N/A');
 
@@ -348,7 +448,16 @@ const ChatInterface: React.FC<Props> = ({ category, onBack, userGender, language
             ? (user?.gender === 'male' ? 'Hannya (حنية)' : 'Sanad (سند)')
             : (user?.gender === 'male' ? 'Hannya' : 'Sanad');
 
-        const richContext = `[User Context]: Name:${user?.name}, Persona:${personaName}, Mood:${lastMood || 'Unknown'}`;
+        const richContext = `
+        [User Context]:
+        Name: ${user?.name}
+        Age: ${user?.age}
+        Gender: ${user?.gender}
+        Current Emotional State: ${lastMood || 'Unknown (Ask them!)'}
+        Therapy Plan: ${therapyPlanSummary}
+        Partner: ${user?.partner || 'None'}
+        Your Persona: ${personaName}
+        `;
         
         if (messages.length === 0) {
             const firstName = user?.name.split(' ')[0] || '';
@@ -364,7 +473,7 @@ const ChatInterface: React.FC<Props> = ({ category, onBack, userGender, language
             await initializeChat(richContext, baseInstr, undefined, language);
         } else if (hasHistory) {
              let geminiHistory: Content[] = messages.filter(m => !m.text.startsWith('[')).map(m => ({ role: m.role === Role.USER ? 'user' : 'model', parts: [{ text: m.text }] }));
-             await initializeChat(`${richContext} RESUMING SESSION.`, baseInstr, geminiHistory, language);
+             await initializeChat(`${richContext} RESUMING SESSION. Treat as next episode.`, baseInstr, geminiHistory, language);
         }
         
         // Setup Mic
@@ -461,7 +570,7 @@ const ChatInterface: React.FC<Props> = ({ category, onBack, userGender, language
                  <p className="text-gray-600 text-sm mb-8 leading-relaxed">{t.basedOnAssessment}</p>
                  <div className="bg-white/60 rounded-2xl p-4 border border-white/60 mb-8 backdrop-blur-sm shadow-sm">
                      <div className="flex items-center justify-center gap-2 mb-2">
-                         <CalendarCheck size={20} className="text-teal-600" />
+                         <Clock size={20} className="text-teal-600" />
                          <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t.recommendedSessions}</span>
                      </div>
                      <div className="text-4xl font-bold text-gray-900 flex items-end justify-center gap-1 leading-none">
@@ -471,7 +580,7 @@ const ChatInterface: React.FC<Props> = ({ category, onBack, userGender, language
                  </div>
                  <button onClick={() => {if(onBookSession) onBookSession();}} className="w-full py-4 bg-gradient-to-r from-teal-600 to-blue-600 text-white rounded-2xl font-bold shadow-xl flex items-center justify-center gap-2 group">
                      <span>{t.bookSession}</span>
-                     {isRTL ? <ChevronLeft /> : <ChevronRight />}
+                     <ArrowRight className={isRTL ? 'rotate-180' : ''} />
                  </button>
              </div>
           </div>
@@ -490,7 +599,7 @@ const ChatInterface: React.FC<Props> = ({ category, onBack, userGender, language
           {isRTL ? <ArrowRight size={20} /> : <ArrowLeft size={20} />}
         </button>
         <div className={`w-10 h-10 ${category.color} rounded-full flex items-center justify-center text-white shadow-lg flex-shrink-0`}>
-            {category.isSpecialized ? <Sprout size={20} /> : <span className="font-bold text-lg">{t[`cat_${category.id}_title`]?.[0]}</span>}
+            {category.isSpecialized ? <Sparkles size={20} /> : <span className="font-bold text-lg">{t[`cat_${category.id}_title`]?.[0]}</span>}
         </div>
         <div className="flex-1 overflow-hidden">
           <h1 className="text-base font-bold text-gray-900 line-clamp-1">{t[`cat_${category.id}_title`]}</h1>
@@ -538,7 +647,11 @@ const ChatInterface: React.FC<Props> = ({ category, onBack, userGender, language
       {isCallMode && <VoiceOverlay category={category} language={language} isSpeaking={isSpeaking} isListening={isListening} onClose={() => setIsCallMode(false)} onToggleMic={() => {if(recognitionRef.current){ if(isListening) recognitionRef.current.stop(); else recognitionRef.current.start(); setIsListening(!isListening); }}} onStopSpeaking={() => { synth.cancel(); setIsSpeaking(false); }} isStreaming={isStreaming} />}
 
       {/* MESSAGES */}
-      <div className={`flex-1 overflow-y-auto p-4 space-y-6 ${isCallMode ? 'hidden' : 'block'} no-scrollbar`}>
+      <div 
+        ref={containerRef}
+        onScroll={handleScroll}
+        className={`flex-1 overflow-y-auto p-4 space-y-6 ${isCallMode ? 'hidden' : 'block'} no-scrollbar`}
+      >
         {messages.map((msg) => (
           <ChatMessage 
             key={msg.id} 
@@ -565,6 +678,19 @@ const ChatInterface: React.FC<Props> = ({ category, onBack, userGender, language
         )}
         <div ref={messagesEndRef} />
       </div>
+      
+      {/* SCROLL TO BOTTOM BUTTON */}
+      {showScrollButton && !isCallMode && (
+          <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 animate-fadeIn">
+              <button 
+                onClick={scrollToBottom}
+                className="bg-white/80 backdrop-blur-md text-primary-600 px-4 py-2 rounded-full shadow-lg border border-primary-100 flex items-center gap-2 text-xs font-bold hover:bg-white transition-all active:scale-95"
+              >
+                  <ChevronDown size={14} />
+                  {t.scrollToBottom}
+              </button>
+          </div>
+      )}
 
       {/* SUGGESTIONS */}
       {!isStreaming && !isCallMode && suggestions.length > 0 && (

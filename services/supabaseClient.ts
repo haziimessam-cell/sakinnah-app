@@ -1,20 +1,9 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// These should be environmental variables in a real production build.
-// Since we are in a demo environment, these placeholders allow the code to compile
-// but will fail gracefully if not populated.
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_KEY || '';
+// REPLACE THESE WITH YOUR REAL SUPABASE KEYS FROM DASHBOARD
+// For security in production, always use process.env.REACT_APP_SUPABASE_URL
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://YOUR_PROJECT_ID.supabase.co';
+const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'YOUR_ANON_KEY';
 
-let supabase = null;
-
-if (supabaseUrl && supabaseKey) {
-    try {
-        supabase = createClient(supabaseUrl, supabaseKey);
-    } catch (e) {
-        console.warn('Supabase client failed to initialize', e);
-    }
-}
-
-export { supabase };
+export const supabase = createClient(supabaseUrl, supabaseKey);

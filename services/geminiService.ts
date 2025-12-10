@@ -1,19 +1,66 @@
+
 import { GoogleGenAI, Chat, GenerateContentResponse, Content } from "@google/genai";
 import { SYSTEM_INSTRUCTION_AR, SYSTEM_INSTRUCTION_EN } from "../constants";
 import { Language } from "../types";
 
+/* 
+   ================================================================
+   DEPLOYMENT INSTRUCTIONS (FREE & SECURE):
+   ================================================================
+   1. Create 'api/chat.js' in your project or Vercel dashboard.
+   2. Paste this code into 'api/chat.js':
+
+   // --- api/chat.js ---
+   const { GoogleGenerativeAI } = require('@google/generative-ai');
+   export const config = { runtime: 'edge' };
+
+   export default async function handler(req) {
+     if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+     try {
+       const { message, history, systemInstruction } = await req.json();
+       const genAI = new GoogleGenerativeAI(process.env.API_KEY);
+       const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', systemInstruction });
+       
+       // Handle streaming for chat
+       if (history) {
+           const chat = model.startChat({ history: history || [] });
+           const result = await chat.sendMessageStream(message);
+           const stream = new ReadableStream({
+             async start(controller) {
+               for await (const chunk of result.stream) {
+                 const text = chunk.text();
+                 controller.enqueue(new TextEncoder().encode(text));
+               }
+               controller.close();
+             },
+           });
+           return new Response(stream, { headers: { 'Content-Type': 'text/plain' } });
+       } 
+       // Handle single generation (for journal/analysis)
+       else {
+           const result = await model.generateContent(message);
+           return new Response(result.response.text(), { headers: { 'Content-Type': 'text/plain' } });
+       }
+
+     } catch (e) {
+       return new Response(JSON.stringify({ error: e.message }), { status: 500 });
+     }
+   }
+   // --------------------
+
+   3. Set PROXY_URL below to your deployed URL (e.g. 'https://myapp.vercel.app/api/chat').
+   4. Remove process.env.API_KEY usage for production safety.
+*/
+
 let chatSession: Chat | null = null;
 let genAI: GoogleGenAI | null = null;
 
-// --- SECURITY ARCHITECTURE ---
-// In a real production environment, this should point to a secure backend endpoint
-// (e.g. AWS Lambda, Firebase Functions, or Next.js API route)
-// that handles the actual API call to Google.
-// The Client Key should NEVER be exposed.
-//
-// Current Mode: HYBRID DEMO
-// If PROXY_URL is defined, it uses it. If not, it falls back to Client-Side key for functionality.
-const PROXY_URL = ""; // process.env.REACT_APP_API_PROXY; 
+// Set this to your deployed backend URL for production security
+const PROXY_URL = ""; 
+
+// Local state for Proxy Mode (Stateless)
+let localHistory: Content[] = [];
+let localSystemInstruction: string = "";
 
 export const initializeChat = async (
   contextPrompt: string, 
@@ -22,25 +69,22 @@ export const initializeChat = async (
   language: Language = 'ar'
 ) => {
   
-  // 1. Security Check
-  if (!process.env.API_KEY && !PROXY_URL) {
-    console.error("CRITICAL: No API Key or Proxy URL found.");
-    throw new Error("Service Configuration Error");
-  }
-
-  // 2. Initialize Client (Fallback Mode)
-  // In a full secure setup, we wouldn't init GoogleGenAI here, 
-  // we would just prepare the state for the fetch call to the proxy.
-  if (process.env.API_KEY) {
-      genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  }
-  
   const defaultBase = language === 'ar' ? SYSTEM_INSTRUCTION_AR : SYSTEM_INSTRUCTION_EN;
   const baseInstruction = baseInstructionOverride || defaultBase;
   const fullSystemInstruction = `${baseInstruction}\n\n[Context/Session Info]: ${contextPrompt}`;
 
-  try {
-    if (genAI) {
+  // 1. PROXY MODE SETUP
+  if (PROXY_URL) {
+      localSystemInstruction = fullSystemInstruction;
+      // Reset history on new session init, or use provided
+      localHistory = history || [];
+      return { mock: true }; // Return mock object to satisfy caller
+  }
+
+  // 2. CLIENT-SIDE DEMO MODE
+  if (process.env.API_KEY) {
+      genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      try {
         chatSession = genAI.chats.create({
           model: "gemini-2.5-flash",
           config: {
@@ -51,52 +95,112 @@ export const initializeChat = async (
           history: history 
         });
         return chatSession;
-    } else {
-        // Mock session object for Proxy Mode
-        // Logic would be handled in sendMessageStreamToGemini via fetch(PROXY_URL)
-        return null; 
-    }
-  } catch (error) {
-    console.error("Failed to initialize chat", error);
-    throw error;
+      } catch (error) {
+        console.error("Failed to initialize chat", error);
+        throw error;
+      }
   }
+  
+  console.warn("No API Key or Proxy URL found. App will run in offline/preview mode.");
+  return null;
 };
 
 export const sendMessageStreamToGemini = async function* (message: string, language: Language = 'ar') {
-  if (!chatSession && !PROXY_URL) {
-    throw new Error("Chat session not initialized");
-  }
-
-  try {
-    if (chatSession) {
-        // --- DIRECT CLIENT-SIDE CALL (DEMO MODE) ---
+  
+  // --- OPTION A: DIRECT CLIENT-SIDE CALL (DEMO) ---
+  if (chatSession) {
+    try {
         const result = await chatSession.sendMessageStream({ message });
         for await (const chunk of result) {
           const response = chunk as GenerateContentResponse;
           const text = response.text;
-          if (text) {
-            yield text;
-          }
+          if (text) yield text;
         }
-    } else {
-        // --- SECURE PROXY CALL (PRODUCTION MODE) ---
-        // Example implementation of how it would look:
-        /*
-        const response = await fetch(PROXY_URL, {
-            method: 'POST',
-            body: JSON.stringify({ message, language })
-        });
-        const reader = response.body.getReader();
-        while(true) {
-            const {done, value} = await reader.read();
-            if (done) break;
-            yield new TextDecoder().decode(value);
-        }
-        */
-       throw new Error("Proxy not implemented in demo environment");
+    } catch (error) {
+        console.error("Gemini Error:", error);
+        yield language === 'ar' ? "عذراً، حدث خطأ في الاتصال." : "Connection error.";
     }
-  } catch (error) {
-    console.error("Error sending message to Gemini", error);
-    yield language === 'ar' ? "عذراً، واجهت مشكلة تقنية." : "Sorry, I encountered a technical issue.";
+    return;
   }
+
+  // --- OPTION B: SECURE PROXY CALL (PRODUCTION) ---
+  if (PROXY_URL) {
+      try {
+          // Prepare payload: Message + History + System Instruction
+          const payload = {
+              message,
+              history: localHistory,
+              systemInstruction: localSystemInstruction
+          };
+
+          // Optimistic update of local history
+          localHistory.push({ role: 'user', parts: [{ text: message }] });
+
+          const response = await fetch(PROXY_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+          });
+
+          if (!response.ok) throw new Error(`Proxy Error: ${response.status}`);
+          if (!response.body) throw new Error("No response body");
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let fullResponseText = "";
+
+          while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              const chunk = decoder.decode(value, { stream: true });
+              fullResponseText += chunk;
+              yield chunk;
+          }
+
+          // Update history with model response
+          localHistory.push({ role: 'model', parts: [{ text: fullResponseText }] });
+
+      } catch (error) {
+          console.error("Proxy Fetch Error:", error);
+          yield language === 'ar' ? "عذراً، الخادم لا يستجيب." : "Server error.";
+      }
+      return;
+  }
+
+  throw new Error("Configuration Error: No API Key or Proxy URL configured.");
 };
+
+// --- NEW: Helper for single-turn tasks (Journal Analysis, etc.) ---
+export const generateContent = async (prompt: string, systemInstruction?: string) => {
+    // Proxy Mode
+    if (PROXY_URL) {
+        try {
+            const response = await fetch(PROXY_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: prompt, systemInstruction }) // No history
+            });
+            if (!response.ok) throw new Error('Proxy Error');
+            return await response.text();
+        } catch(e) { return null; }
+    }
+    
+    // Client Mode
+    if (process.env.API_KEY) {
+        try {
+            const genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const response = await genAI.models.generateContent({
+                model: "gemini-2.5-flash",
+                contents: prompt,
+                config: {
+                    systemInstruction: systemInstruction
+                }
+            });
+            return response.text;
+        } catch (e) {
+            console.error("Generate Content Error", e);
+            return null;
+        }
+    }
+    return null;
+}
