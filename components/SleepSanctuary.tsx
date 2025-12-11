@@ -187,7 +187,7 @@ const SleepSanctuary: React.FC<Props> = ({ onBack, language }) => {
 
   // Music Player Logic (unchanged)
   useEffect(() => {
-      let interval: NodeJS.Timeout;
+      let interval: ReturnType<typeof setInterval>;
       if (isPlaying && currentTrack) {
           interval = setInterval(() => {
               setTrackProgress(prev => {

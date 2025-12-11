@@ -12,11 +12,12 @@ interface Props {
   onBack: () => void;
   language: Language;
   user: User;
+  initialMode?: 'silent' | 'voice' | 'flow';
 }
 
 type FadfadaMode = 'silent' | 'voice' | 'flow';
 
-const FadfadaSection: React.FC<Props> = ({ onBack, language, user }) => {
+const FadfadaSection: React.FC<Props> = ({ onBack, language, user, initialMode }) => {
   const t = translations[language] as any;
   const isRTL = language === 'ar';
   
@@ -30,7 +31,7 @@ const FadfadaSection: React.FC<Props> = ({ onBack, language, user }) => {
   
   const recognitionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
       // Scroll to bottom of chat
@@ -59,6 +60,12 @@ const FadfadaSection: React.FC<Props> = ({ onBack, language, user }) => {
   }, [language]);
 
   const startMode = async (selectedMode: FadfadaMode) => {
+      // Check speech support
+      if (selectedMode === 'voice' && !recognitionRef.current) {
+         alert(language === 'ar' ? 'عذراً، متصفحك لا يدعم التعرف على الصوت.' : 'Sorry, your browser does not support speech recognition.');
+         return;
+      }
+
       if (navigator.vibrate) navigator.vibrate(10);
       setMode(selectedMode);
       setChatHistory([]);
@@ -71,8 +78,16 @@ const FadfadaSection: React.FC<Props> = ({ onBack, language, user }) => {
       // For Voice Vent, we don't init chat immediately, we wait for recording to finish
       if (selectedMode !== 'voice') {
           await initializeChat("Fadfada Session", sysPrompt, undefined, language);
+      } else {
+          // Auto-start recording if entering voice mode
+          setTimeout(() => toggleRecording(), 500);
       }
   };
+  
+  // Auto-trigger initial mode
+  useEffect(() => {
+      if (initialMode) startMode(initialMode);
+  }, []);
 
   const handleSendMessage = async () => {
       if (!inputText.trim()) return;

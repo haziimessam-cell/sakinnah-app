@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { User, ViewState, Language, Category, BookedSession, DailyChallenge } from './types';
 import LoginPage from './components/LoginPage';
@@ -69,6 +68,9 @@ const App: React.FC = () => {
   
   // Proactive Agent State
   const [proactiveMsg, setProactiveMsg] = useState<string | null>(null);
+  
+  // Fadfada Quick Mode
+  const [fadfadaInitialMode, setFadfadaInitialMode] = useState<'silent' | 'voice' | 'flow' | undefined>(undefined);
   
   // Derived state
   const timeOfDay = new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening';
@@ -289,22 +291,41 @@ const App: React.FC = () => {
                               </div>
                           )}
 
-                          {/* Featured Tools */}
-                          <div className="grid grid-cols-2 gap-4">
-                              <button onClick={() => setView('GARDEN')} className="bg-gradient-to-br from-teal-400 to-emerald-600 p-5 rounded-[2rem] text-white shadow-lg shadow-teal-500/30 text-start group transition-transform active:scale-95">
-                                  <div className="mb-3 bg-white/20 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md">
-                                      <Home size={20} className="text-white" />
+                          {/* Quick Actions & Featured */}
+                          <div>
+                              <button 
+                                  onClick={() => { setFadfadaInitialMode('voice'); setView('FADFADA'); }}
+                                  className="w-full bg-gradient-to-r from-orange-400 to-red-500 p-5 rounded-[2rem] text-white shadow-lg shadow-orange-500/30 text-start group transition-transform active:scale-95 flex items-center gap-4 mb-4 relative overflow-hidden"
+                              >
+                                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
+                                  <div className="bg-white/20 w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md flex-shrink-0 border border-white/30">
+                                      <Icons.Mic size={24} className="text-white" />
                                   </div>
-                                  <h3 className="font-bold text-lg leading-tight mb-1">{t.soulGarden}</h3>
-                                  <p className="text-[10px] opacity-80">{t.soulGardenDesc}</p>
-                              </button>
-                              <button onClick={() => setView('DREAM')} className="bg-gradient-to-br from-indigo-500 to-purple-600 p-5 rounded-[2rem] text-white shadow-lg shadow-purple-500/30 text-start group transition-transform active:scale-95">
-                                  <div className="mb-3 bg-white/20 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md">
-                                      <Icons.Moon size={20} className="text-white" /> 
+                                  <div>
+                                      <h3 className="font-bold text-lg leading-tight mb-1">{t.voiceVent}</h3>
+                                      <p className="text-[10px] opacity-90">{t.voiceVentDesc}</p>
                                   </div>
-                                  <h3 className="font-bold text-lg leading-tight mb-1">{t.dreamAnalysis}</h3>
-                                  <p className="text-[10px] opacity-80">{t.dreamAnalysisDesc}</p>
+                                  <div className="ml-auto bg-white/20 p-2 rounded-full backdrop-blur-sm">
+                                      {isRTL ? <Icons.ArrowLeft size={20} /> : <Icons.ArrowRight size={20} />}
+                                  </div>
                               </button>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                  <button onClick={() => setView('GARDEN')} className="bg-gradient-to-br from-teal-400 to-emerald-600 p-5 rounded-[2rem] text-white shadow-lg shadow-teal-500/30 text-start group transition-transform active:scale-95">
+                                      <div className="mb-3 bg-white/20 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md">
+                                          <Home size={20} className="text-white" />
+                                      </div>
+                                      <h3 className="font-bold text-lg leading-tight mb-1">{t.soulGarden}</h3>
+                                      <p className="text-[10px] opacity-80">{t.soulGardenDesc}</p>
+                                  </button>
+                                  <button onClick={() => setView('DREAM')} className="bg-gradient-to-br from-indigo-500 to-purple-600 p-5 rounded-[2rem] text-white shadow-lg shadow-purple-500/30 text-start group transition-transform active:scale-95">
+                                      <div className="mb-3 bg-white/20 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md">
+                                          <Icons.Moon size={20} className="text-white" /> 
+                                      </div>
+                                      <h3 className="font-bold text-lg leading-tight mb-1">{t.dreamAnalysis}</h3>
+                                      <p className="text-[10px] opacity-80">{t.dreamAnalysisDesc}</p>
+                                  </button>
+                              </div>
                           </div>
 
                           {/* Categories Grid */}
@@ -326,7 +347,7 @@ const App: React.FC = () => {
 
                           {/* Utility Bar */}
                           <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
-                              <button onClick={() => setView('FADFADA')} className="flex-shrink-0 px-6 py-3 bg-orange-100 text-orange-600 rounded-xl font-bold text-sm whitespace-nowrap">
+                              <button onClick={() => { setFadfadaInitialMode(undefined); setView('FADFADA'); }} className="flex-shrink-0 px-6 py-3 bg-orange-100 text-orange-600 rounded-xl font-bold text-sm whitespace-nowrap">
                                   {t.fadfadaTitle}
                               </button>
                               <button onClick={() => setView('SLEEP_TOOL')} className="flex-shrink-0 px-6 py-3 bg-indigo-100 text-indigo-600 rounded-xl font-bold text-sm whitespace-nowrap">
@@ -374,7 +395,7 @@ const App: React.FC = () => {
           case 'SLEEP_TOOL':
               return <SleepSanctuary onBack={() => setView('HOME')} language={language} />;
           case 'FADFADA':
-              return <FadfadaSection onBack={() => setView('HOME')} language={language} user={user!} />;
+              return <FadfadaSection onBack={() => { setView('HOME'); setFadfadaInitialMode(undefined); }} language={language} user={user!} initialMode={fadfadaInitialMode} />;
           case 'JOURNAL':
               return <JournalPage onBack={() => setView('HOME')} language={language} user={user!} />;
           case 'BOOKING':

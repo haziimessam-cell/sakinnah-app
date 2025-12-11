@@ -138,7 +138,7 @@ const LoginPage: React.FC<Props> = ({ onLogin, language, setLanguage }) => {
 
       <div className="w-full max-w-md bg-white/80 backdrop-blur-xl rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/50 relative z-10 animate-[fadeIn_0.6s_ease-out]">
         
-        {/* Onboarding Carousel */}
+        {/* Onboarding Carousel & Logo Area */}
         <div className="bg-gradient-to-br from-primary-600 to-primary-800 text-white p-8 pt-12 pb-16 relative overflow-hidden text-center">
             
             <button onClick={toggleLang} className="absolute top-6 right-6 z-20 bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/30 flex items-center gap-2 hover:bg-white/30 transition-all text-xs font-bold text-white shadow-lg active:scale-95">
@@ -146,21 +146,23 @@ const LoginPage: React.FC<Props> = ({ onLogin, language, setLanguage }) => {
                 <span>{language === 'ar' ? 'English' : 'العربية'}</span>
             </button>
             
-            <div className="absolute top-6 left-6 z-20 flex items-center gap-3 animate-fadeIn">
-                <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/30 shadow-lg">
-                    <Sprout size={24} className="text-white drop-shadow-md" />
+            {/* Center Logo Area */}
+            <div className="flex flex-col items-center justify-center mb-8 relative z-10 animate-fadeIn">
+                <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-3xl flex items-center justify-center border border-white/30 shadow-xl mb-3 transform hover:scale-105 transition-transform duration-500">
+                    <Sprout size={36} className="text-white drop-shadow-md" />
                 </div>
-                <div className="text-left">
-                    <h1 className="text-white font-bold text-lg leading-none tracking-wide drop-shadow-sm font-sans">Sakinnah</h1>
-                    <p className="text-primary-100 text-[10px] tracking-wider uppercase font-medium opacity-80">سكينة</p>
+                <div>
+                    <h1 className="text-white font-bold text-2xl leading-tight tracking-wide drop-shadow-sm font-sans">Sakinnah</h1>
+                    <p className="text-primary-100 text-[10px] tracking-[0.3em] uppercase font-bold opacity-80 mt-1">سكينة</p>
                 </div>
             </div>
 
-            <div className="relative z-10 min-h-[140px] mt-6">
+            <div className="relative z-10 min-h-[120px]">
                 {slides.map((slide, idx) => (
                     <div key={idx} className={`absolute inset-0 flex flex-col items-center justify-center transition-all duration-700 ease-in-out transform ${idx === currentSlide ? 'opacity-100 translate-x-0' : idx < currentSlide ? (isRTL ? 'translate-x-full opacity-0' : '-translate-x-full opacity-0') : (isRTL ? '-translate-x-full opacity-0' : 'translate-x-full opacity-0')}`}>
-                        <div className="text-5xl mb-4 drop-shadow-md">{slide.icon}</div>
-                        <h2 className="text-2xl font-bold mb-2">{slide.title}</h2>
+                        <h2 className="text-xl font-bold mb-2 flex items-center gap-2">
+                            <span>{slide.icon}</span> {slide.title}
+                        </h2>
                         <p className="text-primary-100 text-sm max-w-xs mx-auto leading-relaxed">{slide.desc}</p>
                     </div>
                 ))}

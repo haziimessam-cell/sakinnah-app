@@ -18,7 +18,7 @@ const BreathingExercise: React.FC<Props> = ({ onClose, language }) => {
   const [timeLeft, setTimeLeft] = useState(0);
 
   useEffect(() => {
-      let timer: NodeJS.Timeout;
+      let timer: ReturnType<typeof setTimeout>;
 
       if (phase === 'inhale') {
           setText(t.inhale);
