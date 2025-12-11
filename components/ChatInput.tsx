@@ -1,6 +1,7 @@
 
+
 import React, { useRef, useEffect } from 'react';
-import { Send, Mic, MicOff, StopCircle } from 'lucide-react';
+import { Send, Mic, MicOff, CircleStop } from 'lucide-react';
 import { Language } from '../types';
 
 interface Props {
@@ -80,7 +81,7 @@ const ChatInput: React.FC<Props> = ({
           }`}
         >
           {isStreaming ? (
-            <StopCircle size={20} className="animate-pulse text-primary-600" />
+            <CircleStop size={20} className="animate-pulse text-primary-600" />
           ) : (
             <Send size={20} className={isRTL && inputText.trim() ? 'mr-0.5' : 'ml-0.5'} />
           )} 

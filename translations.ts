@@ -1,5 +1,4 @@
 
-
 import { Language } from "./types";
 
 export const translations = {
@@ -60,19 +59,53 @@ export const translations = {
     offlineTitle: "أنت غير متصل",
     offlineDesc: "تعمل الآن في الوضع غير المتصل. الميزات الذكية قد تكون محدودة.",
     emergencyNumber: "123",
+    online: "متصل",
+    
+    // Proactive Messages
+    welcomeBackShort: "وحشتنا يا {name}.. يارب تكون بخير.",
+    welcomeBackLong: "بقالنا كتير مشوفناكش يا {name}.. مكانك الآمن موجود دايماً.",
     
     // New Revolutionary Features
     soulGarden: "حديقة الروح",
     soulGardenDesc: "شاهد حالتك النفسية تنمو وتزهر.",
-    dreamAnalysis: "مفسر الأحلام",
-    dreamAnalysisDesc: "تحليل نفسي لأحلامك وما يخبرك به عقلك الباطن.",
+    dreamAnalysis: "المختبر النفسي للأحلام",
+    dreamAnalysisDesc: "تحليل سيكولوجي عميق (Jungian Analysis) لرموز العقل الباطن.",
     grounding: "ملاذ الطمأنينة",
     groundingDesc: "تفاعل فيزيائي لتهدئة نوبات الهلع فوراً.",
-    dreamPlaceholder: "اكتب حلمك هنا بالتفصيل... (مثال: حلمت أنني أطير فوق بحر هائج...)",
-    analyzeDream: "تحليل الحلم",
-    interpreting: "جاري استشارة كارل يونغ...",
+    dreamPlaceholder: "اسرد تفاصيل الحلم بدقة... (الأماكن، الأشخاص، الألوان...)",
+    dreamEmotions: "بماذا شعرت داخل الحلم؟",
+    dreamEmotionsPlaceholder: "مثال: خوف، مطاردة، شعور بالسقوط، راحة مفاجئة...",
+    analyzeDream: "بدء التحليل النفسي",
+    interpreting: "جاري تحليل الرموز النفسية...",
     gardenLevel: "مستوى النمو",
     waterGarden: "سقي الحديقة (تسجيل مشاعر)",
+    
+    // Fadfada (Venting)
+    fadfadaTitle: "مساحة فضفضة",
+    fadfadaDesc: "فضفض… وأنا أرتّب لك مشاعرك.",
+    silentMode: "المستمع الصامت",
+    silentModeDesc: "سكينة تستمع فقط ولا تقاطعك. مساحة لتفريغ كل ما بداخلك.",
+    voiceVent: "الفضفضة الصوتية",
+    voiceVentDesc: "سجل بصوتك حتى 10 دقائق. وسأحتوي مشاعرك.",
+    flowChat: "الدردشة الحرة",
+    flowChatDesc: "حديث صديق لصديق. بدون تحليل نفسي أو تعقيد.",
+    ventingJournal: "دفتر الفضفضة",
+    saveToFadfada: "حفظ في الدفتر السري",
+    savedSafely: "تم حفظ فضفضتك في أمان.",
+    imListening: "أنا سامعك.. كمل.",
+    imWithYou: "أنا معاك.",
+    safeSpace: "دي مساحتك الآمنة.",
+    startRecording: "اضغط للتسجيل",
+    stopRecording: "إنهاء الفضفضة",
+    analyzingVent: "جاري استيعاب المشاعر...",
+    fadfadaPlaceholder: "خرج كل اللي جواك.. مفيش قيود هنا.",
+    
+    // Hug & Art
+    virtualHug: "عناق افتراضي",
+    placeOnHeart: "ضع الهاتف على قلبك وتنفس...",
+    painToArt: "تحويل الألم لفن",
+    generatingArt: "جاري رسم مشاعرك...",
+    artGenerated: "هذه اللوحة تمثل حالتك الشعورية الآن.",
     
     // Sleep Sanctuary
     sleepSanctuary: "ملاذ النوم",
@@ -92,6 +125,7 @@ export const translations = {
     chooseTrack: "اختر مقطعاً للاسترخاء",
     nowPlaying: "جاري التشغيل",
     minutes: "دقيقة",
+    storyError: "حدث خطأ بسيط.. حاولي مرة أخرى يا حبيبتي.",
 
     // Breathing
     startBreathing: "ابدأ التنفس",
@@ -138,6 +172,11 @@ export const translations = {
     sessionEnded: "انتهى وقت الجلسة",
     extendSession: "هل تود تمديد الجلسة؟",
     scrollToBottom: "للأحدث",
+    connectionError: "عذراً، حدث خطأ في الاتصال.",
+    serverError: "عذراً، الخادم لا يستجيب.",
+    emergencyDoctor: "طبيب الطوارئ",
+    emergencyGreeting: "أنا معاك يا {name}. سامعك، طمني إيه اللي حصل؟",
+    welcomeGreeting: "أهلاً بك يا **{name}** في قسم **{category}**. \nأنا هنا عشان أسمعك بقلبي.\n\nطمني، حاسس بإيه دلوقت؟",
     
     // Baraem
     baraemTitle: "إعداد خطة براعم",
@@ -164,6 +203,15 @@ export const translations = {
     upcomingSessions: "الجلسات القادمة",
     noUpcoming: "لا توجد جلسات مجدولة",
     reschedule: "تغيير الموعد",
+    partnerLinked: "تم ربط حسابك بنجاح مع",
+    confirmUnlink: "هل أنت متأكد من فك الارتباط؟",
+    doctor: "المستشارة سكينة",
+    chartStart: "البداية",
+    current: "الحالي",
+    goodJob: "أداء رائع! أنت تتقدم بثبات.",
+    noSessions: "لا توجد جلسات سابقة",
+    noBookmarks: "لم تحفظ أي رسائل بعد",
+    enterPartnerUser: "أدخل اسم مستخدم الشريك (مثال: @sara_123)",
     
     // Journal Page
     myJournal: "مذكراتي",
@@ -175,13 +223,15 @@ export const translations = {
     positive: "إيجابي",
     neutral: "محايد",
     negative: "سلبي",
+    analyzing: "جاري التحليل...",
+    confirmDelete: "هل أنت متأكد من الحذف؟",
+    privateEntry: "🔒 تدوين سري (فضفضة)",
     
     // Partner Linking
     relationshipProfile: "إعدادات العلاقات",
     yourUsername: "اسم المستخدم الخاص بك",
     partnerLink: "ربط الشريك",
     partnerLinkDesc: "أضف شريكك لتمكين الذكاء الاصطناعي من فهم الديناميكية بينكما.",
-    enterPartnerUser: "أدخل اسم مستخدم الشريك (مثال: @sara_123)",
     connect: "ربط",
     connected: "مرتبط",
 
@@ -206,6 +256,25 @@ export const translations = {
     removePin: "إلغاء القفل",
     pinSetupSuccess: "تم تفعيل القفل بنجاح",
     pinRemoveSuccess: "تم إلغاء القفل",
+    slow: "بطيء",
+    normal: "طبيعي",
+    fast: "سريع",
+    syncCloud: "المزامنة السحابية",
+    encrypted: "مشفر طرف-إلى-طرف (HIPAA)",
+    statusActive: "الحالة: نشط",
+    syncNow: "مزامنة الآن",
+    backupFile: "نسخ احتياطي (ملف)",
+    lastSaved: "تم الحفظ مؤخراً",
+    saveEncrypted: "حفظ نسخة مشفرة",
+    restoreBackup: "استعادة نسخة",
+    restoreing: "جاري الاستعادة...",
+    fromFile: "من ملف .sakinnah",
+    confirmSync: "هل تريد رفع بياناتك إلى السحابة الآن؟",
+    syncSuccess: "تمت المزامنة بنجاح!",
+    syncFail: "فشلت المزامنة. تأكد من اتصالك.",
+    confirmRestore: "استعادة النسخة الاحتياطية سيستبدل البيانات الحالية. هل أنت متأكد؟",
+    restoreSuccess: "تمت الاستعادة بنجاح! سيتم إعادة تحميل التطبيق.",
+    invalidFile: "فشل الملف. تأكد من أنه ملف سكينة صالح.",
 
     // PIN Lock
     enterPin: "أدخل رمز المرور",
@@ -255,7 +324,8 @@ export const translations = {
     bookingSuccess: "تم الحجز بنجاح!",
     rescheduleSuccess: "تم تعديل الموعد بنجاح!",
     sessionTicket: "تذكرة الجلسة",
-    doctor: "المستشارة سكينة",
+    currentAppt: "الموعد الحالي: ",
+    slotsWarning: "المواعيد متاحة بعد {days} أيام لضمان الفعالية.",
 
     // Notifications
     reminderTitle: "تذكير بالجلسة",
@@ -263,14 +333,28 @@ export const translations = {
     reminder1hTitle: "اقترب موعد جلستك",
     reminder1hBody: "تبدأ جلستك خلال ساعة. يمكنك تغيير الموعد الآن إذا لزم الأمر.",
     bookingConfirmedTitle: "تم تأكيد الحجز",
+    sessionStartsIn: "جلستك مع سكينة تبدأ خلال {minutes} دقيقة!",
     
     // Subscription
     subTitle: "رحلة السكينة مستمرة...",
-    subDesc: "انتهت فترة تجربتك المجانية (14 يوم). لاستكمال رحلة التعافي والوصول إلى كافة المزايا، يرجى الاشتراك.",
+    subDesc: "نأمل أن تكون أيامك الماضية (14 يوم) مليئة بالسكينة. لاستكمال الرحلة والوصول إلى كافة المزايا، يرجى الاشتراك.",
     subPriceEg: "200 جنيه / شهرياً",
     subPriceInt: "7 دولار / شهرياً",
     subButton: "اشترك الآن واستثمر في راحتك",
     subNote: "يمكنك الإلغاء في أي وقت.",
+    bestValue: "الأفضل قيمة",
+    mostPopular: "الأكثر طلباً",
+    perMonth: "شهرياً",
+    plan_daily: "يومي",
+    plan_monthly: "شهري",
+    plan_quarterly: "3 أشهر",
+    plan_yearly: "سنوي",
+    unlimitedAI: "جلسات ذكاء اصطناعي غير محدودة",
+    allTools: "جميع الأدوات (حديقة الروح، الأحلام)",
+    privacyAdFree: "خصوصية تامة بدون إعلانات",
+    activationError: "حدث خطأ في تفعيل الاشتراك. يرجى المحاولة.",
+    subscribedThanks: "شكراً لاشتراكك! استمتع برحلة السكينة.",
+    savings: "توفير",
 
     // Moods
     mood_happy: "سعيد",
@@ -278,6 +362,9 @@ export const translations = {
     mood_sad: "حزين",
     mood_angry: "غاضب",
     mood_anxious: "قلق",
+    howFeelBeforeWater: "كيف تشعر قبل الري؟",
+    gardenGrowMsg: "تنمو حديقتك مع كل جلسة علاجية تكملها. استمر في ري روحك.",
+    sessionsCompleted: "جلسات مكتملة",
 
     // Categories
     cat_baraem_title: "براعم (تنمية المهارات)",
@@ -285,7 +372,7 @@ export const translations = {
     cat_baraem_science: "يعتمد على تحليل السلوك التطبيقي (ABA) واستراتيجيات التربية الإيجابية.",
     
     cat_relationships_title: "العلاقات",
-    cat_relationships_desc: "تحسين التواصل، حل النزاعات، وبناء التفاهم المشترك.",
+    cat_relationships_desc: "تحسين التواصل، حل النزاعات، وبناء التفاهم المشترك. يمكنك إضافة شريكك من خلال صفحتك الشخصية لتواصل أفضل وحلول أقرب.",
     cat_relationships_science: "يستند إلى طريقة جوتمان (Gottman Method) والعلاج المرتكز على العاطفة (EFT).",
     
     cat_general_title: "الاستشارة العامة",
@@ -322,7 +409,26 @@ export const translations = {
 
     // Disclaimer
     disclaimerTitle: "تنويه هام",
+    disclaimerDesc: "سكينة هو واحتك العلمية للاتزان النفسي، مصمم وفق أرقى المعايير العالمية ليكون رفيقك في رحلة الوعي. نحن هنا لتمكينك، مع التأكيد على أن التشخيص الطبي يظل مسؤولية المختصين.",
     acceptContinue: "أوافق وأريد المتابعة",
+    
+    // Modal
+    purposeMethod: "الهدف والمنهجية",
+    scientificBasis: "الأساس العلمي",
+    gotIt: "فهمت",
+    
+    // Misc
+    pushed: "تمت المزامنة (رفع)",
+    pulled: "تمت المزامنة (تحميل)",
+    youOffline: "أنت الآن غير متصل بالإنترنت",
+    profileUpdated: "تم تحديث الملف الشخصي",
+    install: "تثبيت",
+    dreamError: "عذراً، حدث خطأ أثناء الاتصال بعالم الأحلام.",
+    grandmaStoryDesc: "استمع إلى حكايات ما قبل النوم بصوت 'تيتا' المصرية الدافئ، لتهدئة عقلك وقلبك.",
+    musicDesc: "مقاطع موسيقية لمدة 40 دقيقة",
+    cycles: "دورات نوم",
+    grandmaVoice: "قصص دافئة بصوت الجدة المصرية",
+    musicTracks: "مقاطع موسيقية لمدة 40 دقيقة",
   },
   en: {
     // Brand Slogan
@@ -381,20 +487,54 @@ export const translations = {
     offlineTitle: "You are offline",
     offlineDesc: "You are currently offline. Smart features may be limited.",
     emergencyNumber: "911",
+    online: "Online",
+    
+    // Proactive Messages
+    welcomeBackShort: "Missed you, {name}. Hope you're well.",
+    welcomeBackLong: "It's been a while, {name}. Your safe space is still here.",
 
     // New Revolutionary Features
     soulGarden: "Soul Garden",
     soulGardenDesc: "Watch your mental state grow and bloom.",
-    dreamAnalysis: "Dream Architect",
-    dreamAnalysisDesc: "Psychological analysis of your subconscious.",
+    dreamAnalysis: "Dream Psychology Lab",
+    dreamAnalysisDesc: "Scientific depth psychology analysis (Jungian) of subconscious symbols.",
     grounding: "Instant Grounding",
     groundingDesc: "Physics-based interaction for panic relief.",
-    dreamPlaceholder: "Describe your dream in detail... (e.g., I dreamt I was flying over a stormy sea...)",
-    analyzeDream: "Analyze Dream",
-    interpreting: "Consulting Jungian Archetypes...",
+    dreamPlaceholder: "Describe your dream in detail... (People, places, colors, recurring themes)",
+    dreamEmotions: "How did you feel in the dream?",
+    dreamEmotionsPlaceholder: "e.g., Fear, Falling, Sudden Peace, Confused...",
+    analyzeDream: "Start Analysis",
+    interpreting: "Analyzing psychological symbols...",
     gardenLevel: "Growth Level",
     waterGarden: "Water Garden (Log Mood)",
     
+    // Fadfada (Venting)
+    fadfadaTitle: "Venting Space",
+    fadfadaDesc: "Vent... and I will organize your feelings.",
+    silentMode: "Silent Listener",
+    silentModeDesc: "Sakinnah listens without interrupting. Just a safe space to let it all out.",
+    voiceVent: "Voice Vent",
+    voiceVentDesc: "Record up to 10 mins. I will hold your emotions.",
+    flowChat: "Flow Chat",
+    flowChatDesc: "Friend-to-friend talk. No psychoanalysis, just connection.",
+    ventingJournal: "Venting Journal",
+    saveToFadfada: "Save to Secret Journal",
+    savedSafely: "Your venting is safely stored.",
+    imListening: "I'm listening.. go on.",
+    imWithYou: "I'm with you.",
+    safeSpace: "This is your safe space.",
+    startRecording: "Start Recording",
+    stopRecording: "End Venting",
+    analyzingVent: "Understanding emotions...",
+    fadfadaPlaceholder: "Let it all out.. no restrictions here.",
+    
+    // Hug & Art
+    virtualHug: "Virtual Hug",
+    placeOnHeart: "Place phone on your heart and breathe...",
+    painToArt: "Pain to Art",
+    generatingArt: "Painting your emotions...",
+    artGenerated: "This abstract art represents your current emotional state.",
+
     // Sleep Sanctuary
     sleepSanctuary: "Sleep Sanctuary",
     sleepSanctuaryDesc: "Smart tools for deep and restful sleep.",
@@ -413,6 +553,7 @@ export const translations = {
     chooseTrack: "Choose a relaxing track",
     nowPlaying: "Now Playing",
     minutes: "min",
+    storyError: "A small error occurred... please try again, dear.",
 
     // Breathing
     startBreathing: "Start Breathing",
@@ -459,6 +600,11 @@ export const translations = {
     sessionEnded: "Session Ended",
     extendSession: "Extend Session?",
     scrollToBottom: "To Latest",
+    connectionError: "Connection error.",
+    serverError: "Server error.",
+    emergencyDoctor: "Emergency Doctor",
+    emergencyGreeting: "I am here with you, {name}. I'm listening. Tell me what's happening.",
+    welcomeGreeting: "Welcome **{name}** to **{category}**. \nI'm here to listen.\n\nHow are you feeling?",
 
     // Baraem
     baraemTitle: "Baraem Plan Setup",
@@ -485,6 +631,15 @@ export const translations = {
     upcomingSessions: "Upcoming Sessions",
     noUpcoming: "No sessions scheduled",
     reschedule: "Reschedule",
+    partnerLinked: "Your account has been linked with",
+    confirmUnlink: "Are you sure you want to unlink?",
+    doctor: "Counselor Sakinnah",
+    chartStart: "Start",
+    current: "Current",
+    goodJob: "Great job! You are making steady progress.",
+    noSessions: "No session history",
+    noBookmarks: "No bookmarked messages",
+    enterPartnerUser: "Enter partner username (e.g. @alex_123)",
     
     // Journal Page
     myJournal: "My Journal",
@@ -496,13 +651,15 @@ export const translations = {
     positive: "Positive",
     neutral: "Neutral",
     negative: "Negative",
+    analyzing: "Analyzing...",
+    confirmDelete: "Are you sure you want to delete?",
+    privateEntry: "🔒 Private Entry (Fadfada)",
     
     // Partner Linking
     relationshipProfile: "Relationship Settings",
     yourUsername: "Your Username",
     partnerLink: "Link Partner",
     partnerLinkDesc: "Add your partner to help AI understand your dynamic.",
-    enterPartnerUser: "Enter partner username (e.g. @alex_123)",
     connect: "Connect",
     connected: "Connected",
 
@@ -527,6 +684,25 @@ export const translations = {
     removePin: "Remove Lock",
     pinSetupSuccess: "App Lock Enabled",
     pinRemoveSuccess: "App Lock Removed",
+    slow: "Slow",
+    normal: "Normal",
+    fast: "Fast",
+    syncCloud: "Cloud Sync",
+    encrypted: "End-to-End Encrypted (HIPAA)",
+    statusActive: "Status: Active",
+    syncNow: "Sync Now",
+    backupFile: "Backup to File",
+    lastSaved: "Last saved just now",
+    saveEncrypted: "Save encrypted copy",
+    restoreBackup: "Restore Backup",
+    restoreing: "Restoring...",
+    fromFile: "From .sakinnah file",
+    confirmSync: "Sync data to cloud now?",
+    syncSuccess: "Sync successful!",
+    syncFail: "Sync failed. Check connection.",
+    confirmRestore: "Restoring will overwrite current data. Continue?",
+    restoreSuccess: "Restore successful! App will reload.",
+    invalidFile: "Invalid file format.",
 
     // PIN Lock
     enterPin: "Enter Passcode",
@@ -576,7 +752,8 @@ export const translations = {
     bookingSuccess: "Booking Confirmed!",
     rescheduleSuccess: "Rescheduled Successfully!",
     sessionTicket: "Session Ticket",
-    doctor: "Counselor Sakinnah",
+    currentAppt: "Current: ",
+    slotsWarning: "Slots available after {days} days for best results.",
 
     // Notifications
     reminderTitle: "Session Reminder",
@@ -584,14 +761,28 @@ export const translations = {
     reminder1hTitle: "Session in 1 Hour",
     reminder1hBody: "Your session is in 1 hour. You can reschedule now if needed.",
     bookingConfirmedTitle: "Booking Confirmed",
+    sessionStartsIn: "Your session with Sakinnah starts in {minutes} minutes!",
 
     // Subscription
-    subTitle: "The Journey Continues...",
-    subDesc: "Your 14-day free trial has ended. To continue your path to serenity and access all features, please subscribe.",
+    subTitle: "Your Serenity Journey",
+    subDesc: "We hope you found peace in your first 14 days. To continue nurturing your soul and access all features, please subscribe.",
     subPriceEg: "200 EGP / Month",
     subPriceInt: "$7 / Month",
     subButton: "Subscribe for Peace of Mind",
     subNote: "Cancel anytime.",
+    bestValue: "Best Value",
+    mostPopular: "Most Popular",
+    perMonth: "Month",
+    plan_daily: "Daily",
+    plan_monthly: "Monthly",
+    plan_quarterly: "3 Months",
+    plan_yearly: "Yearly",
+    unlimitedAI: "Unlimited AI Therapy Sessions",
+    allTools: "All Tools (Soul Garden, Dreams)",
+    privacyAdFree: "Total Privacy & Ad-Free",
+    activationError: "Activation failed. Please try again.",
+    subscribedThanks: "Subscribed! Enjoy your journey.",
+    savings: "Save",
 
     // Moods
     mood_happy: "Happy",
@@ -599,6 +790,9 @@ export const translations = {
     mood_sad: "Sad",
     mood_angry: "Angry",
     mood_anxious: "Anxious",
+    howFeelBeforeWater: "How do you feel?",
+    gardenGrowMsg: "Your garden grows with every therapy session you complete. Keep watering your soul.",
+    sessionsCompleted: "Sessions Completed",
 
     // Categories
     cat_baraem_title: "Baraem (Development)",
@@ -606,7 +800,7 @@ export const translations = {
     cat_baraem_science: "Based on Applied Behavior Analysis (ABA) and Positive Parenting strategies.",
     
     cat_relationships_title: "Relationships",
-    cat_relationships_desc: "Improving communication, conflict resolution, and understanding.",
+    cat_relationships_desc: "Improving communication, conflict resolution, and understanding. You can link your partner from your profile for better connection.",
     cat_relationships_science: "Based on the Gottman Method and Emotionally Focused Therapy (EFT).",
     
     cat_general_title: "General Consult",
@@ -643,6 +837,25 @@ export const translations = {
 
     // Disclaimer
     disclaimerTitle: "Important Disclaimer",
+    disclaimerDesc: "Sakinnah is your scientific sanctuary for mental balance, designed with world-class standards to accompany your journey of awareness. We empower you, while affirming that medical diagnosis remains the domain of professionals.",
     acceptContinue: "I Agree & Continue",
+    
+    // Modal
+    purposeMethod: "Purpose & Methodology",
+    scientificBasis: "Scientific Basis",
+    gotIt: "Got it",
+    
+    // Misc
+    pushed: "Data Synced (Pushed)",
+    pulled: "Data Synced (Pulled)",
+    youOffline: "You are now offline",
+    profileUpdated: "Profile Updated",
+    install: "Install",
+    dreamError: "Error connecting to the dream realm.",
+    grandmaStoryDesc: "Listen to bedtime stories with the warm voice of Grandma Sakinnah.",
+    musicDesc: "40-minute relaxing tracks",
+    cycles: "Cycles",
+    grandmaVoice: "Warm stories with Grandma's voice",
+    musicTracks: "40-minute relaxing tracks",
   }
 };

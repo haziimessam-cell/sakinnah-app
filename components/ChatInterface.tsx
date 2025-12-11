@@ -1,723 +1,360 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Message, Role, Category, Gender, AssessmentResult, Language, TherapyPlan, SavedMessage, User, SessionSummary } from '../types';
-import { translations } from '../translations';
+import { User, Message, Role, Category, Language } from '../types';
 import { sendMessageStreamToGemini, initializeChat } from '../services/geminiService';
-import { ragService } from '../services/ragService';
-import { syncService } from '../services/syncService';
-import { CATEGORY_QUESTIONS, BARAEM_SYSTEM_INSTRUCTION_AR, BARAEM_SYSTEM_INSTRUCTION_EN, RELATIONSHIPS_SYSTEM_INSTRUCTION_AR, RELATIONSHIPS_SYSTEM_INSTRUCTION_EN, SLEEP_CHAT_SYSTEM_INSTRUCTION_AR, SLEEP_CHAT_SYSTEM_INSTRUCTION_EN, SYSTEM_INSTRUCTION_AR, SYSTEM_INSTRUCTION_EN } from '../constants';
-import { ArrowRight, ArrowLeft, Phone, LogOut, Sparkles, Clock, CheckCircle, ChevronDown } from 'lucide-react';
-import { Content } from '@google/genai';
-
-// Imported Sub-Components (Clean Architecture)
-import ChatMessage from './ChatMessage';
-import AssessmentWizard from './AssessmentWizard';
-import VoiceOverlay from './VoiceOverlay';
+import { memoryService } from '../services/memoryService';
 import ChatInput from './ChatInput';
+import ChatMessage from './ChatMessage';
+import VoiceOverlay from './VoiceOverlay';
+import { ArrowLeft, ArrowRight, MoreVertical, Phone, Video, GripHorizontal } from 'lucide-react';
+import { translations } from '../translations';
 
 interface Props {
+  user: User;
   category: Category;
-  onBack: () => void;
-  userGender: Gender;
   language: Language;
-  user?: User;
-  lastMood?: string | null;
-  onBookSession?: () => void;
+  onBack: () => void;
 }
 
-const ChatInterface: React.FC<Props> = ({ category, onBack, userGender, language, user, lastMood, onBookSession }) => {
+const ChatInterface: React.FC<Props> = ({ user, category, language, onBack }) => {
   const t = translations[language] as any;
   const isRTL = language === 'ar';
   
-  // --- STORAGE KEYS ---
-  const storageKey = `sakinnah_chat_${category.id}_${language}`;
-  const assessmentKey = `sakinnah_assessment_${category.id}_${language}`;
-  const planKey = `sakinnah_plan_${language}`;
-  const bookmarksKey = `sakinnah_bookmarks`;
-  const summariesKey = `sakinnah_summaries`;
-  const sessionStartKey = `sakinnah_session_start_${category.id}`; 
-  
-  // --- LOAD INITIAL STATE ---
-  const loadMessages = (): Message[] => {
-      try {
-          const saved = localStorage.getItem(storageKey);
-          if (saved) return JSON.parse(saved).map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }));
-      } catch (e) { console.error(e); }
-      return [];
-  };
-
-  const loadAssessment = (): AssessmentResult | null => {
-      try {
-          const saved = localStorage.getItem(assessmentKey);
-          if (saved) return JSON.parse(saved);
-      } catch (e) { }
-      return null;
-  };
-
-  // --- STATE ---
-  const [messages, setMessages] = useState<Message[]>(loadMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [isCallMode, setIsCallMode] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [silenceTimer, setSilenceTimer] = useState<NodeJS.Timeout | null>(null);
-  const [isSummarizing, setIsSummarizing] = useState(false);
-  const [generatedSummary, setGeneratedSummary] = useState<SessionSummary | null>(null);
-  const [showRecommendation, setShowRecommendation] = useState(false);
-  const [recommendedPlan, setRecommendedPlan] = useState<TherapyPlan | null>(null);
-  const [totalScore, setTotalScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState<number | null>(null);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   
-  // UX State
-  const [showScrollButton, setShowScrollButton] = useState(false);
-
-  // Assessment Logic
-  const hasHistory = messages.length > 0;
-  const existingAssessment = loadAssessment();
-  const categoryQuestions = CATEGORY_QUESTIONS[category.id] || CATEGORY_QUESTIONS['general'];
-  const shouldShowAssessment = categoryQuestions && categoryQuestions.length > 0 && !hasHistory && !existingAssessment;
-  const [isAssessmentMode, setIsAssessmentMode] = useState(shouldShowAssessment);
-  const [assessmentStep, setAssessmentStep] = useState(0);
-  const [assessmentData, setAssessmentData] = useState<AssessmentResult>(existingAssessment || {});
-
-  // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  const isCallModeRef = useRef(false);
   const synth = window.speechSynthesis;
-  const isCallModeRef = useRef(isCallMode);
-  const isListeningRef = useRef(isListening);
-  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const userGender = user.gender;
 
-  // --- EFFECT: VOICE LOADING ---
   useEffect(() => {
-      const loadVoices = () => {
-          const voices = synth.getVoices();
-          setAvailableVoices(voices);
-      };
-      loadVoices();
-      if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = loadVoices;
-  }, []);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isStreaming]);
 
-  // --- EFFECT: PERSISTENCE & CLOUD SYNC ---
-  useEffect(() => { 
-      // Save Local
-      localStorage.setItem(storageKey, JSON.stringify(messages));
-      
-      // Auto-Sync to Cloud (Debounced)
-      if (messages.length > 0 && !isStreaming) {
-          if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
-          syncTimeoutRef.current = setTimeout(() => {
-              syncService.saveChatSession(category.id, messages);
-          }, 3000); // Sync 3 seconds after last update to prevent spamming
-      }
-  }, [messages, storageKey, category.id, isStreaming]);
-
-  useEffect(() => { isCallModeRef.current = isCallMode; }, [isCallMode]);
-  useEffect(() => { isListeningRef.current = isListening; }, [isListening]);
-
-  // --- EFFECT: TIMER & PLAN LOAD ---
+  // --- SMART VOICE LOADER ---
   useEffect(() => {
-    let duration = 30;
-    try {
-        const savedPlanStr = localStorage.getItem(planKey);
-        if (savedPlanStr) {
-            const plan: TherapyPlan = JSON.parse(savedPlanStr);
-            duration = plan.sessionDuration || 30;
+    const loadVoices = () => {
+        const voices = synth.getVoices();
+        if (voices.length > 0) {
+            setAvailableVoices(voices);
         }
-    } catch (e) {}
-
-    const savedStart = sessionStorage.getItem(sessionStartKey);
-    const now = Date.now();
-    let secondsElapsed = 0;
-
-    if (savedStart) {
-        secondsElapsed = Math.floor((now - parseInt(savedStart)) / 1000);
-    } else {
-        sessionStorage.setItem(sessionStartKey, now.toString());
+    };
+    
+    loadVoices();
+    // Chrome/Android loads voices asynchronously
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = loadVoices;
     }
-    const remaining = Math.max(0, (duration * 60) - secondsElapsed);
-    setTimeLeft(remaining);
-  }, [category.id, sessionStartKey, planKey]);
-
-  useEffect(() => {
-    if (isAssessmentMode || showRecommendation || timeLeft === null) return;
+    
+    // Fallback: Retry every 500ms for 3 seconds if empty (common Android issue)
     const interval = setInterval(() => {
-        setTimeLeft(prev => {
-            if (prev === null || prev <= 0) {
-                clearInterval(interval);
-                return 0;
-            }
-            return prev - 1;
-        });
-    }, 1000);
+        if (synth.getVoices().length === 0) loadVoices();
+        else clearInterval(interval);
+    }, 500);
+
     return () => clearInterval(interval);
-  }, [isAssessmentMode, showRecommendation, timeLeft]);
-
-  // --- SCROLL HANDLING ---
-  const scrollToBottom = () => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      setShowScrollButton(false);
-  };
-
-  const handleScroll = () => {
-      if (!containerRef.current) return;
-      const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-      const isBottom = scrollHeight - scrollTop - clientHeight < 100;
-      setShowScrollButton(!isBottom);
-  };
-
-  // Auto-scroll logic: Only auto-scroll if already near bottom
-  useEffect(() => { 
-      if (!containerRef.current) return;
-      const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
-      const isBottom = scrollHeight - scrollTop - clientHeight < 150;
-      if (isBottom || messages.length === 1) {
-          scrollToBottom();
-      }
-  }, [messages, isStreaming, suggestions]);
-
-  // --- EFFECT: SUGGESTIONS ---
-  useEffect(() => {
-      if (messages.length > 0 && messages[messages.length - 1].role === Role.MODEL && !isStreaming && !isAssessmentMode && !showRecommendation) {
-          const lastMsg = messages[messages.length - 1].text.toLowerCase();
-          let newSuggestions = [];
-          if (language === 'ar') {
-             if (lastMsg.includes('?')) newSuggestions = ['مش عارف الصراحة', 'ممكن', 'أيوة فعلاً عندك حق'];
-             else if (lastMsg.includes('حزين') || lastMsg.includes('اكتئاب')) newSuggestions = ['إزاي أعدي الفترة دي؟', 'أنا محتاج خطة', 'هو ده طبيعي؟'];
-             else if (lastMsg.includes('قلق')) newSuggestions = ['علمني أتنفس صح', 'طمني والنبي', 'إيه السبب؟'];
-             else newSuggestions = ['قولي كمان', 'فهمتك، كمل', 'إيه الخطوة الجاية؟'];
-          } else {
-             if (lastMsg.includes('?')) newSuggestions = ['I don\'t know', 'Maybe', 'Yes, exactly'];
-             else if (lastMsg.includes('sad')) newSuggestions = ['How to overcome this?', 'Is this normal?', 'I need a plan'];
-             else newSuggestions = ['Tell me more', 'I understand', 'What is next?'];
-          }
-          setSuggestions(newSuggestions.slice(0, 3));
-      } else {
-          setSuggestions([]);
-      }
-  }, [messages, isStreaming, isAssessmentMode, language, showRecommendation]);
-
-  // --- AUDIO UTILS ---
-  const playSound = useCallback((type: 'send' | 'receive' | 'success') => {
-      try {
-          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          
-          if (type === 'send') {
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(800, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.1);
-            gain.gain.setValueAtTime(0.05, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
-            osc.start();
-            osc.stop(ctx.currentTime + 0.1);
-          } else if (type === 'receive') {
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(400, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + 0.15);
-            gain.gain.setValueAtTime(0.05, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-            osc.start();
-            osc.stop(ctx.currentTime + 0.15);
-          } else {
-             osc.type = 'triangle';
-             osc.frequency.setValueAtTime(400, ctx.currentTime);
-             osc.frequency.linearRampToValueAtTime(800, ctx.currentTime + 0.2);
-             gain.gain.setValueAtTime(0.05, ctx.currentTime);
-             gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-             osc.start();
-             osc.stop(ctx.currentTime + 0.3);
-          }
-      } catch (e) {}
   }, []);
 
-  // --- VOICE LOGIC ---
-  const getOptimalVoice = (lang: Language, gender: 'male' | 'female') => {
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-      const targetGender = gender === 'male' ? 'female' : 'male';
-      const voices = availableVoices;
+  useEffect(() => {
+    // Load Chat History
+    const chatKey = `sakinnah_chat_${category.id}_${language}`;
+    const saved = localStorage.getItem(chatKey);
+    if (saved) {
+        setMessages(JSON.parse(saved).map((m: any) => ({...m, timestamp: new Date(m.timestamp)})));
+    } else {
+        const greeting: Message = {
+            id: 'init',
+            role: Role.MODEL,
+            text: t.welcomeGreeting.replace('{name}', user.name).replace('{category}', t[`cat_${category.id}_title`] || category.id),
+            timestamp: new Date()
+        };
+        setMessages([greeting]);
+    }
 
-      if (lang === 'en') {
-          return targetGender === 'female' 
-            ? voices.find(v => v.name.includes('Samantha') || v.name.includes('Female')) || voices.find(v => v.lang.startsWith('en'))
-            : voices.find(v => v.name.includes('Daniel') || v.name.includes('Male')) || voices.find(v => v.lang.startsWith('en'));
-      } else {
-          if (targetGender === 'female') {
-              const preferred = ['Google', 'Laila', 'Mariam', 'Salma', 'Microsoft Hoda'];
-              for (const name of preferred) {
-                  const hit = voices.find(v => v.name.includes(name) && v.lang.includes('ar'));
-                  if (hit) return hit;
+    const initGemini = async () => {
+        const systemInstruction = t[`cat_${category.id}_science`] || "";
+        
+        // Initial Retrieval: Get "General/Critical" memories
+        const memoryContext = memoryService.retrieveRelevantMemories("important family job health", user.username);
+        
+        const contextPrompt = `User: ${user.name}, Age: ${user.age}, Gender: ${user.gender}, Category: ${category.id}\n${memoryContext}`;
+        
+        // Inject specific persona name based on user gender
+        const personaName = user.gender === 'male' 
+            ? (language === 'ar' ? "Hannya (حنية)" : "Grace")
+            : (language === 'ar' ? "Sanad (سند)" : "Atlas");
+            
+        const fullPrompt = `${contextPrompt}\nYour Assigned Persona Name: ${personaName}`;
+
+        await initializeChat(fullPrompt, systemInstruction, undefined, language);
+    };
+    initGemini();
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = false;
+        recognitionRef.current.lang = language === 'ar' ? 'ar-EG' : 'en-US';
+        recognitionRef.current.onresult = (event: any) => {
+            const transcript = event.results[0][0].transcript;
+            setInputText(prev => prev + ' ' + transcript);
+            setIsListening(false);
+        };
+        recognitionRef.current.onerror = () => setIsListening(false);
+        recognitionRef.current.onend = () => setIsListening(false);
+    }
+  }, [category.id, language, user, t]);
+
+  const saveMessages = (msgs: Message[]) => {
+      const chatKey = `sakinnah_chat_${category.id}_${language}`;
+      localStorage.setItem(chatKey, JSON.stringify(msgs));
+  };
+
+  // --- SMART VOICE SELECTION ALGORITHM ---
+  const getOptimalVoice = (lang: Language, gender: 'male' | 'female') => {
+      const targetGender = gender === 'male' ? 'female' : 'male'; // Therapist Persona
+      const langPrefix = lang === 'ar' ? 'ar' : 'en';
+      
+      // Filter by language first
+      const langVoices = availableVoices.filter(v => v.lang.startsWith(langPrefix));
+      
+      // PRIORITY 1: High Quality Cloud Voices (Google/Siri/Enhanced)
+      // These sound human on Android/iOS without tuning.
+      const premiumKeywords = ['Google', 'Siri', 'Enhanced', 'Premium', 'Natural'];
+      const premiumVoices = langVoices.filter(v => premiumKeywords.some(k => v.name.includes(k)));
+
+      // PRIORITY 2: Gender Matching within Premium
+      if (premiumVoices.length > 0) {
+          // Try to guess gender from name (e.g., "Google US English" is usually female, "Maged" is male)
+          if (lang === 'ar') {
+              if (targetGender === 'female') {
+                  const femaleAr = premiumVoices.find(v => v.name.includes('Laila') || v.name.includes('Salma') || v.name.includes('Google')); // Google AR is usually female/neutral
+                  if (femaleAr) return { voice: femaleAr, isRobotic: false };
+              } else {
+                  const maleAr = premiumVoices.find(v => v.name.includes('Maged') || v.name.includes('Tarik'));
+                  if (maleAr) return { voice: maleAr, isRobotic: false };
               }
-              if (isIOS) {
-                  const maged = voices.find(v => v.name.includes('Maged'));
-                  if (maged) return maged; 
-              }
+              return { voice: premiumVoices[0], isRobotic: false };
           } else {
-              const preferred = ['Maged', 'Tarik', 'Google', 'Microsoft Naayf'];
-              for (const name of preferred) {
-                  const hit = voices.find(v => v.name.includes(name) && v.lang.includes('ar'));
-                  if (hit) return hit;
+              // English
+              if (targetGender === 'female') {
+                  const f = premiumVoices.find(v => v.name.includes('Samantha') || v.name.includes('Google US English'));
+                  if (f) return { voice: f, isRobotic: false };
+              } else {
+                  const m = premiumVoices.find(v => v.name.includes('Daniel') || v.name.includes('Google UK English Male'));
+                  if (m) return { voice: m, isRobotic: false };
               }
+              return { voice: premiumVoices[0], isRobotic: false };
           }
-          return voices.find(v => v.lang.startsWith('ar'));
       }
+
+      // PRIORITY 3: Standard System Voices (Often Robotic)
+      // If we fall back here, we flag 'isRobotic' to apply pitch/rate tuning.
+      return { voice: langVoices[0] || null, isRobotic: true };
   };
 
   const detectEmotion = (text: string) => {
       const t = text.toLowerCase();
-      
-      // Joy/Excitement (High Pitch, Fast Rate)
-      if (['wow', 'amazing', 'great', 'congrats', 'excited', 'yay', 'happy', 'wonderful', 'مذهل', 'رائع', 'ممتاز', 'مبروك', 'يا سلام'].some(k => t.includes(k))) return 'excited';
-      
-      // Empathy/Sadness (Low Pitch, Slow Rate)
-      if (['sorry', 'understand', 'feel you', 'pain', 'hard', 'grief', 'sad', 'struggle', 'أسف', 'حاسس بيك', 'صعب', 'ألم', 'حزن', 'سلامة قلبك'].some(k => t.includes(k))) return 'empathetic';
-      
-      // Reassurance/Calm (Normal Pitch, Slow Rate, Soft)
-      if (['don\'t worry', 'calm', 'breathe', 'relax', 'safe', 'fine', 'okay', 'هدي', 'اطمن', 'متخافش', 'بخير', 'أمان', 'أنا جنبك'].some(k => t.includes(k))) return 'reassuring';
-      
-      // Curiosity (Rising intonation simulated by slightly higher pitch)
-      if (t.includes('?') || ['what', 'why', 'how', 'tell me', 'share', 'ماذا', 'لماذا', 'كيف', 'احكيلي', 'قولي'].some(k => t.includes(k))) return 'curious';
-      
-      // Serious/Authoritative (Lower Pitch, Normal Rate)
-      if (['plan', 'focus', 'must', 'step', 'goal', 'important', 'listen', 'خطة', 'ركز', 'لازم', 'مهم', 'اسمعني', 'نصيحة'].some(k => t.includes(k))) return 'serious';
-      
+      // Expanded Arabic/English emotion keywords
+      if (['wow', 'amazing', 'happy', 'love', 'haha', 'ya habibi', 'رائع', 'يا حبيبي', 'يا بطل', 'ممتاز', 'هاها'].some(k => t.includes(k))) return 'excited';
+      if (['sorry', 'sad', 'pain', 'hard', 'hurt', 'feel you', 'أسف', 'حزين', 'صعب', 'ألم', 'معلش', 'سلامة قلبك', 'حاسس بيك'].some(k => t.includes(k))) return 'empathetic';
+      if (['calm', 'breathe', 'relax', 'safe', 'okay', 'fine', 'هدي', 'اطمن', 'بخير', 'تنفس', 'أمان'].some(k => t.includes(k))) return 'reassuring';
+      if (['plan', 'step', 'goal', 'advice', 'listen', 'خطة', 'نصيحة', 'اسمع'].some(k => t.includes(k))) return 'serious';
+      if (['?', 'why', 'how', 'what', 'tell me', 'لماذا', 'كيف', 'إيه', 'احكيلي'].some(k => t.includes(k))) return 'curious';
       return 'neutral';
   };
 
   const speakText = useCallback((text: string, forceCancel = true) => {
     if (forceCancel && synth.speaking) synth.cancel();
-    if (availableVoices.length === 0) { const voices = synth.getVoices(); if (voices.length > 0) setAvailableVoices(voices); }
-
-    const emotion = detectEmotion(text);
-    const cleanText = text.replace(/[*_~`]/g, '').replace(/\[.*?\]/g, '');
+    
+    // Clean text: Remove markdown, emojis, and bracketed notes
+    const cleanText = text.replace(/[*_~`]/g, '').replace(/\[.*?\]/g, '').replace(/[^\p{L}\p{N}\s.,?!،؟]/gu, '');
+    
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = language === 'ar' ? 'ar-EG' : 'en-US';
     
-    const selectedVoice = getOptimalVoice(language, userGender);
-    if (selectedVoice) utterance.voice = selectedVoice;
+    // Smart Selection
+    const { voice, isRobotic } = getOptimalVoice(language, userGender);
+    if (voice) utterance.voice = voice;
 
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    let basePitch = 1.0; 
-    let baseRate = 1.0;
+    const emotion = detectEmotion(text);
     const targetVoiceGender = userGender === 'male' ? 'female' : 'male';
-    const userSpeedMultiplier = user?.voiceSpeed || 1.0; // Apply User Preference
-    
-    // Base Identity Tuning
-    if (targetVoiceGender === 'female') {
-        if (selectedVoice?.name.includes('Maged')) { 
-            // If forcing male voice to sound female (iOS fallback)
-            basePitch = 1.4; baseRate = 0.95; 
-        } else { 
-            // Natural female voice
-            basePitch = 1.1; baseRate = 0.95; 
-        }
-    } else { 
-        // Male Identity
-        basePitch = 0.9; baseRate = 0.95; 
+    const userSpeed = user.voiceSpeed || 1.0;
+
+    // --- DYNAMIC TUNING ENGINE ---
+    // Base settings based on Persona
+    let pitch = 1.0;
+    let rate = 1.0;
+
+    if (language === 'en') {
+        if (targetVoiceGender === 'female') { pitch = 1.1; rate = 0.95; } // Grace: Soft, slightly high
+        else { pitch = 0.9; rate = 0.95; } // Atlas: Deep, steady
+    } else {
+        if (targetVoiceGender === 'female') { pitch = 1.1; rate = 0.9; } // Hannya: Warm, motherly
+        else { pitch = 0.85; rate = 0.95; } // Sanad: Deep, protective
     }
 
-    if (isIOS) { 
-        baseRate = baseRate * 0.9; 
-        if (language === 'ar') baseRate = 0.85; 
-    }
-
-    // Apply User Speed Setting
-    baseRate = baseRate * userSpeedMultiplier;
-
-    // Dynamic Emotion Modulation
+    // Emotion Modulation
     switch (emotion) {
-        case 'empathetic': 
-            utterance.pitch = basePitch - 0.2; 
-            utterance.rate = baseRate * 0.8; // Very slow
-            utterance.volume = 0.8; // Soft
-            break;
-        case 'reassuring':
-            utterance.pitch = basePitch - 0.1;
-            utterance.rate = baseRate * 0.85; // Slow and steady
-            utterance.volume = 0.9;
-            break;
-        case 'excited': 
-            utterance.pitch = basePitch + 0.2; 
-            utterance.rate = baseRate * 1.15; // Faster
-            utterance.volume = 1.0;
-            break;
-        case 'curious':
-            utterance.pitch = basePitch + 0.1; 
-            utterance.rate = baseRate * 1.05;
-            break;
-        case 'serious': 
-            utterance.pitch = basePitch - 0.3; // Deeper
-            utterance.rate = baseRate * 0.9; 
-            utterance.volume = 1.0; // Clear
-            break;
-        default: 
-            utterance.pitch = basePitch; 
-            utterance.rate = baseRate;
+        case 'empathetic': pitch -= 0.1; rate *= 0.85; break; // Sad/Warm -> Slower, Lower
+        case 'reassuring': pitch -= 0.05; rate *= 0.9; break; // Calm -> Steady
+        case 'excited': pitch += 0.15; rate *= 1.1; break; // Happy -> Higher, Faster
+        case 'curious': pitch += 0.05; break; // Question -> Slight tilt up
+        case 'serious': rate *= 0.95; pitch -= 0.05; break; // Serious -> Grounded
     }
-    
+
+    // ROBOTIC COMPENSATION
+    // If using a low-quality system voice, we must soften it.
+    if (isRobotic) {
+        // Robotic voices are often too fast and metallic.
+        // Solution: Slow down significantly and lower pitch to add "body".
+        rate *= 0.85; 
+        pitch *= 0.9;
+        
+        // Android specific hack: Android voices often ignore pitch if rate is too fast
+        if (rate > 0.9) rate = 0.9; 
+    }
+
+    // Apply User Preference
+    utterance.pitch = Math.max(0.5, Math.min(2, pitch));
+    utterance.rate = Math.max(0.5, Math.min(2, rate * userSpeed));
+
     utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => { 
-        if (!synth.speaking) { 
-            setIsSpeaking(false); 
-            if (isCallModeRef.current && recognitionRef.current) { 
-                try { recognitionRef.current.start(); setIsListening(true); } catch(e) {} 
-            } 
+        setIsSpeaking(false); 
+        if (isCallModeRef.current && recognitionRef.current) { 
+            try { recognitionRef.current.start(); setIsListening(true); } catch(e) {} 
         } 
     };
+    
     synth.speak(utterance);
-  }, [language, userGender, availableVoices, user?.voiceSpeed]);
+  }, [language, userGender, availableVoices, user.voiceSpeed]);
 
-  // --- ACTIONS ---
-  const handleSend = async (overrideText?: string) => {
-    const textToSend = overrideText || inputText;
-    if (!textToSend.trim() && !overrideText) return;
-    if (isStreaming) return;
-    if (isListening && recognitionRef.current) { recognitionRef.current.stop(); setIsListening(false); }
-    if (silenceTimer) clearTimeout(silenceTimer);
-    if (navigator.vibrate) navigator.vibrate(20);
-    playSound('send');
-
-    if (!textToSend.startsWith('[')) setMessages(prev => [...prev, { id: Date.now().toString(), role: Role.USER, text: textToSend, timestamp: new Date() }]);
-    setInputText(''); setSuggestions([]); setIsStreaming(true); if (synth.speaking) synth.cancel();
-
-    // RAG Injection
-    const clinicalContext = ragService.retrieveContext(textToSend, language);
-    const promptToSend = clinicalContext ? `${textToSend}\n\n${clinicalContext}` : textToSend;
-
-    try {
-      const aiMsgId = (Date.now() + 1).toString();
-      let accumulatedText = "";
-      setMessages(prev => [...prev, { id: aiMsgId, role: Role.MODEL, text: "", timestamp: new Date() }]);
-
-      const stream = sendMessageStreamToGemini(promptToSend, language);
-      let firstChunk = true;
-      let sentenceBuffer = "";
-
-      for await (const chunk of stream) {
-        if(firstChunk) { playSound('receive'); firstChunk = false; }
-        accumulatedText += chunk;
-        setMessages(prev => prev.map(msg => msg.id === aiMsgId ? { ...msg, text: accumulatedText } : msg));
-
-        if (isCallMode) {
-            sentenceBuffer += chunk;
-            const sentenceMatch = sentenceBuffer.match(/^(.+?)([.!؟?:\n]+)(.*)$/s);
-            if (sentenceMatch) {
-                const sentence = sentenceMatch[1] + sentenceMatch[2];
-                const remainder = sentenceMatch[3] || "";
-                if (sentence.trim().length > 1) speakText(sentence, false); 
-                sentenceBuffer = remainder;
-            }
-        }
+  const handleSendMessage = async () => {
+      if (!inputText.trim()) return;
+      const userMsg: Message = { id: Date.now().toString(), role: Role.USER, text: inputText, timestamp: new Date() };
+      setMessages(prev => [...prev, userMsg]);
+      
+      // --- LONG TERM MEMORY INJECTION ---
+      // 1. Search for relevant memories based on what user just typed
+      const relevantMemories = memoryService.retrieveRelevantMemories(inputText, user.username);
+      
+      // 2. Prepend invisible context for the AI
+      // The user won't see this, but the AI will.
+      let textToProcess = inputText;
+      if (relevantMemories) {
+          textToProcess = `${relevantMemories}\n\n[USER_MESSAGE]: ${inputText}`;
+          console.log("🐘 Context Injected:", relevantMemories.length);
       }
-      if (isCallMode && sentenceBuffer.trim().length > 0) speakText(sentenceBuffer, false);
-    } catch (error) { console.error(error); } finally { setIsStreaming(false); }
+
+      setInputText('');
+      setIsStreaming(true);
+
+      // Extract new facts in background
+      memoryService.extractAndSaveMemory(inputText, user.username);
+
+      try {
+          const stream = sendMessageStreamToGemini(textToProcess, language);
+          let aiText = '';
+          const aiMsgId = (Date.now() + 1).toString();
+          setMessages(prev => [...prev, { id: aiMsgId, role: Role.MODEL, text: '', timestamp: new Date() }]);
+          
+          for await (const chunk of stream) {
+              aiText += chunk;
+              setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: aiText } : m));
+          }
+          const finalMessages = [...messages, userMsg, { id: aiMsgId, role: Role.MODEL, text: aiText, timestamp: new Date() }];
+          saveMessages(finalMessages);
+          if (isCallModeRef.current) speakText(aiText);
+      } catch (e) { console.error(e); } finally { setIsStreaming(false); }
   };
 
-  const initChat = async () => {
-        let baseInstr = language === 'ar' ? SYSTEM_INSTRUCTION_AR : SYSTEM_INSTRUCTION_EN;
-        if (category.id === 'baraem') baseInstr = language === 'ar' ? BARAEM_SYSTEM_INSTRUCTION_AR : BARAEM_SYSTEM_INSTRUCTION_EN;
-        else if (category.id === 'relationships') baseInstr = language === 'ar' ? RELATIONSHIPS_SYSTEM_INSTRUCTION_AR : RELATIONSHIPS_SYSTEM_INSTRUCTION_EN;
-        else if (category.id === 'sleep') baseInstr = language === 'ar' ? SLEEP_CHAT_SYSTEM_INSTRUCTION_AR : SLEEP_CHAT_SYSTEM_INSTRUCTION_EN;
-        
-        // Retrieve Therapy Plan from storage to inject
-        const savedPlanStr = localStorage.getItem(planKey);
-        let therapyPlanSummary = "No current plan.";
-        if (savedPlanStr) {
-            const plan: TherapyPlan = JSON.parse(savedPlanStr);
-            therapyPlanSummary = `Category: ${plan.category}, Severity: ${plan.severity}, Focus: ${plan.focusArea}`;
-        }
-
-        baseInstr = baseInstr
-            .replace('[UserName]', user?.name || 'User')
-            .replace('[UserAge]', user?.age || 'Unknown')
-            .replace('[UserGender]', user?.gender || 'Unknown')
-            .replace('[UserMood]', lastMood || 'Unknown')
-            .replace('[TherapyPlan]', therapyPlanSummary)
-            .replace('[CurrentTime]', new Date().toLocaleTimeString())
-            .replace('[PartnerName]', user?.partner || 'N/A');
-
-        const personaName = language === 'ar' 
-            ? (user?.gender === 'male' ? 'Hannya (حنية)' : 'Sanad (سند)')
-            : (user?.gender === 'male' ? 'Hannya' : 'Sanad');
-
-        const richContext = `
-        [User Context]:
-        Name: ${user?.name}
-        Age: ${user?.age}
-        Gender: ${user?.gender}
-        Current Emotional State: ${lastMood || 'Unknown (Ask them!)'}
-        Therapy Plan: ${therapyPlanSummary}
-        Partner: ${user?.partner || 'None'}
-        Your Persona: ${personaName}
-        `;
-        
-        if (messages.length === 0) {
-            const firstName = user?.name.split(' ')[0] || '';
-            const initialGreeting: Message = {
-                id: 'init-1',
-                role: Role.MODEL,
-                text: language === 'ar' 
-                    ? `أهلاً بك يا **${firstName}** في قسم **${t[`cat_${category.id}_title`]}**. \nأنا هنا عشان أسمعك بقلبي.\n\nطمني، حاسس بإيه دلوقت؟`
-                    : `Welcome **${firstName}** to **${t[`cat_${category.id}_title`]}**. \nI'm here to listen.\n\nHow are you feeling?`,
-                timestamp: new Date()
-            };
-            setMessages([initialGreeting]);
-            await initializeChat(richContext, baseInstr, undefined, language);
-        } else if (hasHistory) {
-             let geminiHistory: Content[] = messages.filter(m => !m.text.startsWith('[')).map(m => ({ role: m.role === Role.USER ? 'user' : 'model', parts: [{ text: m.text }] }));
-             await initializeChat(`${richContext} RESUMING SESSION. Treat as next episode.`, baseInstr, geminiHistory, language);
-        }
-        
-        // Setup Mic
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (SpeechRecognition) {
-            recognitionRef.current = new SpeechRecognition();
-            recognitionRef.current.continuous = true;
-            recognitionRef.current.lang = language === 'ar' ? 'ar-EG' : 'en-US';
-            recognitionRef.current.interimResults = true;
-            recognitionRef.current.onresult = (event: any) => {
-                let final = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) final += event.results[i][0].transcript;
-                }
-                if (final) {
-                    setInputText(prev => prev + ' ' + final);
-                    if (isCallModeRef.current) { if(silenceTimer) clearTimeout(silenceTimer); setSilenceTimer(setTimeout(() => handleSend(), 2500)); }
-                }
-            };
-            recognitionRef.current.onend = () => { if (isListeningRef.current && isCallModeRef.current) try { recognitionRef.current.start(); } catch(e) {} else setIsListening(false); };
-        }
+  const handleCopy = (text: string, id: string) => {
+      navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
   };
 
-  useEffect(() => { 
-      if(!isAssessmentMode && !showRecommendation) initChat(); 
-      return () => { if (recognitionRef.current) recognitionRef.current.stop(); if(silenceTimer) clearTimeout(silenceTimer); synth.cancel(); }
-  }, [category.id, language, isAssessmentMode, showRecommendation]);
-
-  // --- HANDLERS ---
-  const handleCopy = useCallback((text: string, id: string) => { navigator.clipboard.writeText(text); setCopiedId(id); setTimeout(() => setCopiedId(null), 2000); }, []);
-  const handleBookmark = useCallback((msg: Message) => {
-      const isBookmarked = msg.isBookmarked;
-      setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, isBookmarked: !isBookmarked } : m));
-      const savedBookmarksStr = localStorage.getItem(bookmarksKey);
-      let bookmarks: SavedMessage[] = savedBookmarksStr ? JSON.parse(savedBookmarksStr) : [];
-      if (isBookmarked) bookmarks = bookmarks.filter(b => b.id !== msg.id);
-      else bookmarks.push({ id: msg.id, text: msg.text, category: category.id, timestamp: new Date() });
-      localStorage.setItem(bookmarksKey, JSON.stringify(bookmarks));
-      if (user) syncService.pushToCloud(user.username);
-  }, [category.id, user]);
-
-  const handleAssessmentAnswer = (answer: string, index: number) => {
-      setAssessmentData(prev => ({ ...prev, [categoryQuestions[assessmentStep].id]: answer }));
-      setTotalScore(prev => prev + index);
-      if (assessmentStep < categoryQuestions.length - 1) {
-          setAssessmentStep(prev => prev + 1);
-      } else {
-          // Calculate Result
-          const maxScore = categoryQuestions.length * 3;
-          const isHighSeverity = (totalScore + index) / maxScore > 0.4;
-          const newPlan: TherapyPlan = {
-             category: category.id,
-             severity: isHighSeverity ? (language === 'ar' ? 'متقدمة' : 'High') : (language === 'ar' ? 'متوسطة' : 'Moderate'),
-             sessionsPerWeek: isHighSeverity ? 3 : 2,
-             sessionDuration: isHighSeverity ? 40 : 30,
-             focusArea: 'CBT & Mindfulness',
-             nextMilestone: 'Resilience'
-          };
-          localStorage.setItem(planKey, JSON.stringify(newPlan));
-          localStorage.setItem(assessmentKey, JSON.stringify({...assessmentData, [categoryQuestions[assessmentStep].id]: answer}));
-          setRecommendedPlan(newPlan);
-          setIsAssessmentMode(false);
-          setShowRecommendation(true);
-      }
+  const handleBookmark = (msg: Message) => {
+      const updated = messages.map(m => m.id === msg.id ? { ...m, isBookmarked: !m.isBookmarked } : m);
+      setMessages(updated);
+      saveMessages(updated);
+      const key = `sakinnah_bookmarks`;
+      let bookmarks = JSON.parse(localStorage.getItem(key) || '[]');
+      if (msg.isBookmarked) bookmarks = bookmarks.filter((b: any) => b.id !== msg.id);
+      else bookmarks.push({ ...msg, category: category.id });
+      localStorage.setItem(key, JSON.stringify(bookmarks));
   };
-
-  const handleEndSession = async () => {
-      setIsSummarizing(true);
-      const summaryText = "Session Summary..."; // Mock for brevity, real app calls API
-      setGeneratedSummary({ id: Date.now().toString(), date: new Date(), category: category.id, points: ["Point 1", "Point 2"] });
-      setIsSummarizing(false);
-  };
-
-  const handleSaveAndBook = () => {
-      if(generatedSummary) {
-          const savedSums = JSON.parse(localStorage.getItem(summariesKey) || '[]');
-          savedSums.unshift(generatedSummary);
-          localStorage.setItem(summariesKey, JSON.stringify(savedSums));
-          if(onBookSession) onBookSession();
-      }
-  };
-
-  // --- RENDER ---
-  
-  if (showRecommendation && recommendedPlan) {
-      // Recommendation Screen (Plan)
-      return (
-          <div className="flex flex-col h-full bg-transparent relative animate-fadeIn p-6 items-center justify-center">
-             <div className="w-full max-w-sm bg-white/70 backdrop-blur-md rounded-[2.5rem] p-8 shadow-2xl border border-white/50 text-center animate-scaleIn transform-gpu">
-                 <div className="w-20 h-20 bg-gradient-to-br from-teal-400 to-blue-500 rounded-2xl flex items-center justify-center text-white mx-auto mb-6 shadow-lg shadow-teal-500/30 transform -rotate-6">
-                     <CheckCircle size={40} />
-                 </div>
-                 <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.planReady}</h2>
-                 <p className="text-gray-600 text-sm mb-8 leading-relaxed">{t.basedOnAssessment}</p>
-                 <div className="bg-white/60 rounded-2xl p-4 border border-white/60 mb-8 backdrop-blur-sm shadow-sm">
-                     <div className="flex items-center justify-center gap-2 mb-2">
-                         <Clock size={20} className="text-teal-600" />
-                         <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t.recommendedSessions}</span>
-                     </div>
-                     <div className="text-4xl font-bold text-gray-900 flex items-end justify-center gap-1 leading-none">
-                         {recommendedPlan.sessionsPerWeek}
-                         <span className="text-sm font-medium text-gray-500 mb-1">{t.sessionsPerWeek}</span>
-                     </div>
-                 </div>
-                 <button onClick={() => {if(onBookSession) onBookSession();}} className="w-full py-4 bg-gradient-to-r from-teal-600 to-blue-600 text-white rounded-2xl font-bold shadow-xl flex items-center justify-center gap-2 group">
-                     <span>{t.bookSession}</span>
-                     <ArrowRight className={isRTL ? 'rotate-180' : ''} />
-                 </button>
-             </div>
-          </div>
-      );
-  }
-
-  if (isAssessmentMode) {
-      return <AssessmentWizard questions={categoryQuestions} currentStep={assessmentStep} onAnswer={handleAssessmentAnswer} onBack={onBack} language={language} />;
-  }
 
   return (
-    <div className="flex flex-col h-full bg-transparent relative animate-fadeIn transform-gpu">
-      {/* HEADER */}
-      <header className="bg-white/40 backdrop-blur-md px-4 py-3 shadow-sm flex items-center gap-3 z-10 sticky top-0 pt-safe border-b border-white/20 transition-all">
-        <button onClick={onBack} className="p-2 hover:bg-white/60 rounded-full text-gray-600">
-          {isRTL ? <ArrowRight size={20} /> : <ArrowLeft size={20} />}
-        </button>
-        <div className={`w-10 h-10 ${category.color} rounded-full flex items-center justify-center text-white shadow-lg flex-shrink-0`}>
-            {category.isSpecialized ? <Sparkles size={20} /> : <span className="font-bold text-lg">{t[`cat_${category.id}_title`]?.[0]}</span>}
-        </div>
-        <div className="flex-1 overflow-hidden">
-          <h1 className="text-base font-bold text-gray-900 line-clamp-1">{t[`cat_${category.id}_title`]}</h1>
-          <p className="text-xs text-green-700 flex items-center gap-1 font-medium"><span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Online</p>
-        </div>
-        {timeLeft !== null && timeLeft > 0 && (
-             <div className={`hidden md:flex px-3 py-1.5 rounded-full backdrop-blur-md border border-white/30 items-center gap-2 shadow-sm ${timeLeft < 300 ? 'bg-red-50 text-red-600 animate-pulse' : 'bg-white/40 text-teal-700'}`}>
-                 <Clock size={14} />
-                 <span className="font-mono font-bold text-sm">{Math.floor(timeLeft/60)}:{(timeLeft%60).toString().padStart(2,'0')}</span>
-             </div>
-        )}
-        <div className="flex items-center gap-1">
-             <button onClick={handleEndSession} className="p-2 rounded-full text-gray-500 hover:text-red-500"><LogOut size={18} className={isRTL ? 'rotate-180' : ''} /></button>
-             <button onClick={() => { setIsCallMode(!isCallMode); if(!isCallMode) speakText(" "); }} className={`p-2 rounded-full transition-all ${isCallMode ? 'bg-green-100 text-green-600' : 'text-gray-600'}`}><Phone size={20} /></button>
-        </div>
+    <div className="h-full flex flex-col bg-slate-50 relative">
+      <header className="px-4 py-3 bg-white shadow-sm flex items-center justify-between z-10">
+          <div className="flex items-center gap-3">
+              <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                  {isRTL ? <ArrowRight size={24} /> : <ArrowLeft size={24} />}
+              </button>
+              <div>
+                  <h1 className="font-bold text-gray-800 text-lg leading-tight">{t[`cat_${category.id}_title`] || category.id}</h1>
+                  <p className="text-xs text-primary-600 font-medium flex items-center gap-1">
+                      <span className={`w-2 h-2 rounded-full ${isStreaming ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></span>
+                      {isStreaming ? t.typing : t.online}
+                  </p>
+              </div>
+          </div>
+          <div className="flex gap-2">
+              <button onClick={() => { isCallModeRef.current = true; speakText(t.hereForYou); }} className="p-2 text-primary-600 bg-primary-50 rounded-full hover:bg-primary-100 transition-colors"><Phone size={20} /></button>
+              <button className="p-2 text-gray-400 hover:text-gray-600"><MoreVertical size={20} /></button>
+          </div>
       </header>
 
-      {/* SUMMARY MODAL */}
-      {(generatedSummary || isSummarizing) && (
-          <div className="absolute inset-0 z-50 bg-black/40 backdrop-blur-md flex flex-col items-center justify-center p-6 animate-fadeIn">
-              {isSummarizing ? (
-                  <div className="bg-white/90 p-6 rounded-[2rem] flex flex-col items-center shadow-2xl animate-slideUp">
-                      <div className="w-12 h-12 border-4 border-primary-500 rounded-full border-t-transparent animate-spin mb-4"></div>
-                      <h3 className="text-lg font-bold text-gray-800">{t.generatingSummary}</h3>
-                  </div>
-              ) : (
-                  <div className="bg-white/90 backdrop-blur-md rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden animate-slideUp">
-                      <div className="bg-gradient-to-r from-teal-500 to-emerald-600 p-6 text-white text-center">
-                           <CheckCircle size={32} className="mx-auto mb-2" />
-                           <h2 className="text-2xl font-bold">{t.sessionSummary}</h2>
-                      </div>
-                      <div className="p-6 space-y-4">
-                           <ul className="space-y-2 mb-4">
-                               {generatedSummary?.points.map((p, i) => <li key={i} className="text-sm text-gray-700 flex gap-2"><span className="text-teal-500">•</span>{p}</li>)}
-                           </ul>
-                           <button onClick={handleSaveAndBook} className="w-full py-3 bg-primary-600 text-white rounded-xl font-bold shadow-lg">{t.saveAndBook}</button>
-                           <button onClick={() => {onBack();}} className="w-full py-3 bg-gray-100 text-gray-600 rounded-xl font-bold">{t.saveToProfile}</button>
-                      </div>
-                  </div>
-              )}
-          </div>
-      )}
-
-      {/* VOICE OVERLAY */}
-      {isCallMode && <VoiceOverlay category={category} language={language} isSpeaking={isSpeaking} isListening={isListening} onClose={() => setIsCallMode(false)} onToggleMic={() => {if(recognitionRef.current){ if(isListening) recognitionRef.current.stop(); else recognitionRef.current.start(); setIsListening(!isListening); }}} onStopSpeaking={() => { synth.cancel(); setIsSpeaking(false); }} isStreaming={isStreaming} />}
-
-      {/* MESSAGES */}
-      <div 
-        ref={containerRef}
-        onScroll={handleScroll}
-        className={`flex-1 overflow-y-auto p-4 space-y-6 ${isCallMode ? 'hidden' : 'block'} no-scrollbar`}
-      >
-        {messages.map((msg) => (
-          <ChatMessage 
-            key={msg.id} 
-            msg={msg} 
-            language={language} 
-            isStreaming={isStreaming && msg.role === Role.MODEL && msg.id === messages[messages.length-1].id} 
-            isSpeaking={isSpeaking} 
-            copiedId={copiedId} 
-            onSpeak={speakText} 
-            onCopy={handleCopy} 
-            onBookmark={handleBookmark} 
-          />
-        ))}
-        {isStreaming && (
-            <div className="flex justify-end animate-fadeIn">
-                 <div className="bg-white/60 backdrop-blur-md px-4 py-3 rounded-2xl rounded-bl-none border border-white/40 flex items-center gap-3 mb-2 shadow-sm min-w-[100px]">
-                    <div className="flex space-x-1 space-x-reverse">
-                        <div className="w-2 h-2 bg-primary-400 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    </div>
-                 </div>
-            </div>
-        )}
-        <div ref={messagesEndRef} />
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#e5ddd5]/30">
+          {messages.map((msg) => (
+              <ChatMessage 
+                key={msg.id} 
+                msg={msg} 
+                language={language}
+                isStreaming={isStreaming && msg.id === messages[messages.length - 1].id}
+                isSpeaking={isSpeaking}
+                copiedId={copiedId}
+                onSpeak={speakText}
+                onCopy={handleCopy}
+                onBookmark={handleBookmark}
+              />
+          ))}
+          <div ref={messagesEndRef} />
       </div>
-      
-      {/* SCROLL TO BOTTOM BUTTON */}
-      {showScrollButton && !isCallMode && (
-          <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 animate-fadeIn">
-              <button 
-                onClick={scrollToBottom}
-                className="bg-white/80 backdrop-blur-md text-primary-600 px-4 py-2 rounded-full shadow-lg border border-primary-100 flex items-center gap-2 text-xs font-bold hover:bg-white transition-all active:scale-95"
-              >
-                  <ChevronDown size={14} />
-                  {t.scrollToBottom}
-              </button>
-          </div>
-      )}
 
-      {/* SUGGESTIONS */}
-      {!isStreaming && !isCallMode && suggestions.length > 0 && (
-          <div className="px-4 pb-2 flex gap-2 overflow-x-auto no-scrollbar animate-fadeIn">
-              {suggestions.map((sugg, i) => (
-                  <button key={i} onClick={() => handleSend(sugg)} className="flex-shrink-0 bg-white/70 backdrop-blur-md border border-white/60 text-primary-700 px-4 py-2 rounded-full text-sm font-medium hover:bg-white transition-colors shadow-sm flex items-center gap-1 active:scale-95"><Sparkles size={12} /> {sugg}</button>
-              ))}
-          </div>
-      )}
-
-      {/* INPUT AREA */}
-      {!isCallMode && (
-          <ChatInput 
-            inputText={inputText}
-            setInputText={setInputText}
-            onSend={handleSend}
-            isListening={isListening}
-            onToggleMic={() => {
-                if (isListening) { recognitionRef.current?.stop(); setIsListening(false); }
-                else { recognitionRef.current?.start(); setIsListening(true); }
-            }}
-            isStreaming={isStreaming}
-            language={language}
-            t={t}
-            isRTL={isRTL}
+      {isCallModeRef.current && (
+          <VoiceOverlay 
+             category={category} 
+             language={language} 
+             isSpeaking={isSpeaking} 
+             isListening={isListening} 
+             onClose={() => { isCallModeRef.current = false; synth.cancel(); setIsSpeaking(false); }}
+             onToggleMic={() => {}}
+             onStopSpeaking={() => { synth.cancel(); setIsSpeaking(false); }}
+             isStreaming={isStreaming}
           />
       )}
+
+      <ChatInput 
+          inputText={inputText}
+          setInputText={setInputText}
+          onSend={handleSendMessage}
+          isListening={isListening}
+          onToggleMic={() => { if (isListening) { recognitionRef.current?.stop(); setIsListening(false); } else { recognitionRef.current?.start(); setIsListening(true); } }}
+          isStreaming={isStreaming}
+          language={language}
+          t={t}
+          isRTL={isRTL}
+      />
     </div>
   );
 };

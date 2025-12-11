@@ -1,15 +1,22 @@
 
 
-
-
 import React, { useState, useEffect } from 'react';
 import { User, Achievement, MonthlyReport, Language, TherapyPlan, JournalEntry, SavedMessage, SessionSummary, BookedSession } from '../types';
 import { translations } from '../translations';
 import { ACHIEVEMENTS, MOCK_REPORTS } from '../constants';
 import * as Icons from 'lucide-react';
-import { ArrowRight, ArrowLeft, Download, Copy, Sprout, TrendingUp, Trophy, Activity, CheckCircle, Brain, Target, Clock, Hourglass, BookOpen, PenTool, Check, Bookmark, HeartHandshake, Link as LinkIcon, History, Edit2, Save, X, Trash2, CalendarCheck, MapPin, RefreshCw, ChevronRight, ChevronLeft } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Download, Copy, Sprout, TrendingUp, Trophy, Activity, CircleCheck, Brain, Target, Clock, Hourglass, BookOpen, PenTool, Check, Bookmark, HeartHandshake, Link as LinkIcon, History, Pencil, Save, X, Trash2, CalendarCheck, MapPin, RefreshCw, ChevronRight, ChevronLeft, Flag, Map, Wind } from 'lucide-react';
 import { realtimeService } from '../services/realtimeService';
 import { syncService } from '../services/syncService';
+
+// SAFE ICON MAP for Achievements
+const ACH_ICON_MAP: Record<string, any> = {
+    'Flag': Flag,
+    'Map': Map,
+    'BookOpen': BookOpen,
+    'Wind': Wind,
+    'Trophy': Trophy
+};
 
 interface Props {
   user: User;
@@ -54,10 +61,7 @@ const ProfilePage: React.FC<Props> = ({ user, onBack, language, onUpdateUser, on
             if (msg.payload.partnerUsername === user.username) {
                 const updatedUser = { ...user, partner: msg.payload.initiator };
                 onUpdateUser(updatedUser);
-                alert(language === 'ar' 
-                    ? `تم ربط حسابك بنجاح مع ${msg.payload.initiator}` 
-                    : `Your account has been linked with ${msg.payload.initiator}`
-                );
+                alert(t.partnerLinked + ' ' + msg.payload.initiator);
             }
         }
     });
@@ -125,28 +129,6 @@ const ProfilePage: React.FC<Props> = ({ user, onBack, language, onUpdateUser, on
       setIsEditing(false);
   };
 
-  const handleSaveJournal = () => {
-      if (!journalText.trim()) return;
-      const sentiment = journalText.length > 20 ? 'positive' : 'neutral';
-      const tags = ['#Optimism', '#Gratitude']; 
-      const newEntry: JournalEntry = {
-          id: Date.now().toString(),
-          date: new Date(),
-          text: journalText,
-          tags,
-          sentiment
-      };
-      
-      const updatedEntries = [newEntry, ...journalEntries];
-      setJournalEntries(updatedEntries);
-      localStorage.setItem('sakinnah_journal', JSON.stringify(updatedEntries));
-      
-      setJournalText('');
-      setIsJournalSaved(true);
-      setTimeout(() => setIsJournalSaved(false), 2000);
-      syncService.pushToCloud(user.username);
-  };
-
   const handleLinkPartner = () => {
       if (partnerInput.trim() && partnerInput !== user.username) {
           const updatedUser = { ...user, partner: partnerInput.trim() };
@@ -160,7 +142,7 @@ const ProfilePage: React.FC<Props> = ({ user, onBack, language, onUpdateUser, on
   };
   
   const handleUnlinkPartner = () => {
-      if (window.confirm(language === 'ar' ? 'هل أنت متأكد من فك الارتباط؟' : 'Are you sure you want to unlink?')) {
+      if (window.confirm(t.confirmUnlink)) {
           const { partner, ...rest } = user;
           onUpdateUser(rest as User);
       }
@@ -194,8 +176,6 @@ const ProfilePage: React.FC<Props> = ({ user, onBack, language, onUpdateUser, on
            return `${x},${100 - val}`;
       }).join(' ');
       
-      const lastVal = chartData[chartData.length-1];
-      
       return (
         <div className="relative h-32 w-full mt-4">
             <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full overflow-visible">
@@ -220,8 +200,8 @@ const ProfilePage: React.FC<Props> = ({ user, onBack, language, onUpdateUser, on
                 })}
             </svg>
             <div className="flex justify-between text-[10px] text-gray-400 mt-2 font-mono uppercase tracking-widest">
-                <span>{language === 'ar' ? 'البداية' : 'Start'}</span>
-                <span>{language === 'ar' ? 'الحالي' : 'Current'}</span>
+                <span>{t.chartStart}</span>
+                <span>{t.current}</span>
             </div>
         </div>
       );
@@ -233,7 +213,7 @@ const ProfilePage: React.FC<Props> = ({ user, onBack, language, onUpdateUser, on
             <div className="h-full bg-gradient-to-r from-teal-400 to-teal-600 w-[60%] rounded-full relative shadow-lg animate-[slideLeft_1s_ease-out]"></div>
         </div>
         <p className="text-xs text-teal-600 mt-2 text-center font-bold">
-            {language === 'ar' ? 'أداء رائع! أنت تتقدم بثبات.' : 'Great job! You are making steady progress.'}
+            {t.goodJob}
         </p>
     </div>
   );
@@ -262,7 +242,7 @@ const ProfilePage: React.FC<Props> = ({ user, onBack, language, onUpdateUser, on
                 className="absolute top-6 right-6 p-2.5 bg-white/60 shadow-sm rounded-full text-primary-600 hover:bg-primary-50 transition-colors z-10 backdrop-blur-sm border border-white/40"
                 title={isEditing ? t.saveChanges : t.editProfile}
               >
-                {isEditing ? <Save size={18} /> : <Edit2 size={18} />}
+                {isEditing ? <Save size={18} /> : <Pencil size={18} />}
               </button>
               
               <div className="flex items-center gap-5 mb-8 relative z-10">
@@ -430,8 +410,8 @@ const ProfilePage: React.FC<Props> = ({ user, onBack, language, onUpdateUser, on
                           <div className="grid grid-cols-4 gap-2">
                               {ACHIEVEMENTS.map((ach) => (
                                   <div key={ach.id} className={`aspect-square rounded-2xl flex flex-col items-center justify-center p-2 text-center transition-all ${ach.unlocked ? 'bg-amber-100 text-amber-600 shadow-sm' : 'bg-gray-100 text-gray-300 grayscale opacity-60'}`}>
-                                      {/* FIXED: Add fallback for missing achievement icon to prevent crash */}
-                                      <div className="text-xl mb-1">{React.createElement((Icons as any)[ach.icon] || Icons.Flag, { size: 20 })}</div>
+                                      {/* SAFE RENDER: Use mapped icons */}
+                                      <div className="text-xl mb-1">{React.createElement(ACH_ICON_MAP[ach.icon] || Flag, { size: 20 })}</div>
                                       <div className="text-[8px] font-bold leading-tight">{language === 'ar' ? ach.titleAr : ach.titleEn}</div>
                                   </div>
                               ))}
@@ -492,7 +472,7 @@ const ProfilePage: React.FC<Props> = ({ user, onBack, language, onUpdateUser, on
                        ) : (
                            <div className="text-center py-20 opacity-60">
                                <History size={48} className="mx-auto mb-4 text-gray-300" />
-                               <p className="text-gray-500 font-medium">{language === 'ar' ? 'لا توجد جلسات سابقة' : 'No session history'}</p>
+                               <p className="text-gray-500 font-medium">{t.noSessions}</p>
                            </div>
                        )}
                   </div>
@@ -527,7 +507,7 @@ const ProfilePage: React.FC<Props> = ({ user, onBack, language, onUpdateUser, on
                        ) : (
                            <div className="text-center py-20 opacity-60">
                                <Bookmark size={48} className="mx-auto mb-4 text-gray-300" />
-                               <p className="text-gray-500 font-medium">{language === 'ar' ? 'لم تحفظ أي رسائل بعد' : 'No bookmarked messages'}</p>
+                               <p className="text-gray-500 font-medium">{t.noBookmarks}</p>
                            </div>
                        )}
                    </div>

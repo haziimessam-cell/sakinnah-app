@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Language } from '../types';
 import { translations } from '../translations';
-import { Lock, Delete, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Lock, Delete, ShieldCheck, CircleAlert } from 'lucide-react';
 
 interface Props {
   mode: 'setup' | 'unlock' | 'disable';
@@ -115,7 +115,7 @@ const PinLock: React.FC<Props> = ({ mode, language, onSuccess, onCancel, storedP
         <div className="w-full max-w-sm flex flex-col items-center">
             
             <div className={`w-16 h-16 rounded-3xl flex items-center justify-center mb-6 shadow-lg transition-colors duration-500 ${isSuccess ? 'bg-green-100 text-green-600' : (error ? 'bg-red-100 text-red-600' : 'bg-primary-50 text-primary-600')}`}>
-                {isSuccess ? <ShieldCheck size={32} /> : (error ? <AlertCircle size={32} /> : <Lock size={32} />)}
+                {isSuccess ? <ShieldCheck size={32} /> : (error ? <CircleAlert size={32} /> : <Lock size={32} />)}
             </div>
 
             <h2 className="text-xl font-bold text-gray-800 mb-2">{getTitle()}</h2>

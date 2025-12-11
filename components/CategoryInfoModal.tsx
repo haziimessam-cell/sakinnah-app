@@ -26,10 +26,13 @@ const CategoryInfoModal: React.FC<Props> = ({ category, onClose, language }) => 
     if (category.color.includes('rose')) return 'from-rose-500 to-pink-600';
     if (category.color.includes('red')) return 'from-red-500 to-rose-600';
     if (category.color.includes('teal')) return 'from-teal-500 to-emerald-600';
+    if (category.color.includes('cyan')) return 'from-cyan-500 to-blue-600';
     if (category.color.includes('blue')) return 'from-sky-500 to-blue-600';
     if (category.color.includes('orange')) return 'from-orange-500 to-amber-600';
+    if (category.color.includes('violet') || category.color.includes('fuchsia')) return 'from-violet-500 to-fuchsia-600';
     if (category.color.includes('purple')) return 'from-violet-500 to-purple-600';
     if (category.color.includes('indigo')) return 'from-indigo-500 to-blue-700'; // For Sleep
+    if (category.color.includes('lime') || category.color.includes('green')) return 'from-lime-500 to-green-600';
     if (category.color.includes('slate')) return 'from-slate-500 to-gray-700';
     return 'from-gray-500 to-gray-700';
   };

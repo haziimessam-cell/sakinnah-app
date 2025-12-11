@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { Language, JournalEntry, User } from '../types';
 import { translations } from '../translations';
-import { ArrowLeft, ArrowRight, PenTool, Calendar, Trash2, Save, Smile, Meh, Frown, Plus, X, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, PenTool, Calendar, Trash2, Save, Smile, Meh, Frown, Plus, X, Sparkles, Lock, ShieldCheck } from 'lucide-react';
 import { syncService } from '../services/syncService';
 import { generateContent } from '../services/geminiService';
 
@@ -99,7 +98,7 @@ const JournalPage: React.FC<Props> = ({ onBack, language, user }) => {
   };
 
   const handleDelete = (id: string) => {
-      if (confirm(isRTL ? 'هل أنت متأكد من الحذف؟' : 'Are you sure you want to delete?')) {
+      if (confirm(t.confirmDelete)) {
           const updated = entries.filter(e => e.id !== id);
           setEntries(updated);
           localStorage.setItem('sakinnah_journal', JSON.stringify(updated));
@@ -159,7 +158,7 @@ const JournalPage: React.FC<Props> = ({ onBack, language, user }) => {
                             {analyzing ? (
                                 <>
                                     <Sparkles size={18} className="animate-spin" />
-                                    <span>{language === 'ar' ? 'جاري التحليل...' : 'Analyzing...'}</span>
+                                    <span>{t.analyzing}</span>
                                 </>
                             ) : (
                                 <>
@@ -183,41 +182,56 @@ const JournalPage: React.FC<Props> = ({ onBack, language, user }) => {
             {/* List */}
             {entries.length > 0 ? (
                 <div className="space-y-4 pb-20">
-                    {entries.map((entry) => (
-                        <div key={entry.id} className="bg-white/40 backdrop-blur-md p-5 rounded-2xl border border-white/40 shadow-sm hover:shadow-md transition-all group relative">
-                            <div className="flex justify-between items-start mb-3">
-                                <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                                    <Calendar size={12} />
-                                    {new Date(entry.date).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' })}
-                                </div>
-                                <button 
-                                    onClick={() => handleDelete(entry.id)}
-                                    className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            </div>
-                            
-                            <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap font-medium">{entry.text}</p>
-                            
-                            <div className="mt-4 flex items-center justify-between">
-                                <div className="flex items-center gap-2 bg-white/30 px-3 py-1.5 rounded-xl border border-white/30">
-                                    {getSentimentIcon(entry.sentiment)}
-                                    <span className={`text-xs font-bold ${entry.sentiment === 'positive' ? 'text-green-600' : entry.sentiment === 'negative' ? 'text-red-600' : 'text-gray-600'}`}>
-                                        {getSentimentLabel(entry.sentiment)}
-                                    </span>
+                    {entries.map((entry) => {
+                        const isFadfada = entry.tags?.includes('#Fadfada');
+                        return (
+                            <div key={entry.id} className={`bg-white/40 backdrop-blur-md p-5 rounded-2xl border shadow-sm hover:shadow-md transition-all group relative overflow-hidden ${isFadfada ? 'border-orange-200 bg-orange-50/40' : 'border-white/40'}`}>
+                                {isFadfada && (
+                                    <div className="absolute top-0 right-0 p-1.5 bg-orange-100 rounded-bl-xl border-l border-b border-orange-200 text-orange-500">
+                                        <Lock size={12} />
+                                    </div>
+                                )}
+                                <div className="flex justify-between items-start mb-3">
+                                    <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+                                        <Calendar size={12} />
+                                        {new Date(entry.date).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'long', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' })}
+                                    </div>
+                                    <button 
+                                        onClick={() => handleDelete(entry.id)}
+                                        className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
                                 </div>
                                 
-                                <div className="flex gap-1">
-                                    {entry.tags?.map((tag, i) => (
-                                        <span key={i} className="text-[10px] bg-blue-50 text-blue-600 px-2 py-1 rounded-lg font-bold border border-blue-100">
-                                            {tag}
-                                        </span>
-                                    ))}
+                                <p className="text-gray-800 text-sm leading-relaxed whitespace-pre-wrap font-medium">{entry.text}</p>
+                                
+                                <div className="mt-4 flex items-center justify-between">
+                                    {isFadfada ? (
+                                        <div className="flex items-center gap-1.5 text-xs font-bold text-orange-600 bg-orange-100/50 px-3 py-1.5 rounded-xl border border-orange-100">
+                                            <ShieldCheck size={14} />
+                                            <span>{t.privateEntry}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2 bg-white/30 px-3 py-1.5 rounded-xl border border-white/30">
+                                            {getSentimentIcon(entry.sentiment)}
+                                            <span className={`text-xs font-bold ${entry.sentiment === 'positive' ? 'text-green-600' : entry.sentiment === 'negative' ? 'text-red-600' : 'text-gray-600'}`}>
+                                                {getSentimentLabel(entry.sentiment)}
+                                            </span>
+                                        </div>
+                                    )}
+                                    
+                                    <div className="flex gap-1">
+                                        {entry.tags?.map((tag, i) => (
+                                            <span key={i} className="text-[10px] bg-blue-50 text-blue-600 px-2 py-1 rounded-lg font-bold border border-blue-100">
+                                                {tag}
+                                            </span>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-center opacity-60">

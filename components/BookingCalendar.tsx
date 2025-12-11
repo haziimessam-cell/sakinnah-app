@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, ArrowLeft, Calendar, Clock, Star, CheckCircle, Ticket, MapPin, RefreshCw } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Calendar, Clock, Star, CircleCheck, Ticket, MapPin, RefreshCw } from 'lucide-react';
 import { Language, BookedSession, User } from '../types';
 import { translations } from '../translations';
 
@@ -146,7 +146,7 @@ const BookingCalendar: React.FC<Props> = ({ onBack, onConfirm, language, user, m
                   </div>
 
                   <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center text-white mx-auto mb-6 shadow-lg shadow-green-500/40 animate-scaleIn">
-                      <CheckCircle size={40} />
+                      <CircleCheck size={40} />
                   </div>
                   
                   <h2 className="text-2xl font-bold text-gray-800 mb-2">{isRescheduleMode ? t.rescheduleSuccess : t.bookingSuccess}</h2>

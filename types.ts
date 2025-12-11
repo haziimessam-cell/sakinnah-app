@@ -119,4 +119,13 @@ export interface DailyChallenge {
   color: string;
 }
 
-export type ViewState = 'LOGIN' | 'HOME' | 'CHAT' | 'DISCLAIMER' | 'PROFILE' | 'SETTINGS' | 'HELP' | 'BREATHING' | 'GARDEN' | 'DREAM' | 'GROUNDING' | 'BOOKING' | 'SLEEP_TOOL' | 'SUBSCRIPTION' | 'JOURNAL';
+// --- NEW: Long Term Memory ---
+export interface Memory {
+    id: string;
+    content: string; // The fact (e.g., "Boss name is Ahmed")
+    tags: string[]; // Keywords for retrieval (e.g., "work", "boss", "stress")
+    importance: number; // 1-5
+    timestamp: string;
+}
+
+export type ViewState = 'LOGIN' | 'HOME' | 'CHAT' | 'DISCLAIMER' | 'PROFILE' | 'SETTINGS' | 'HELP' | 'BREATHING' | 'GARDEN' | 'DREAM' | 'GROUNDING' | 'BOOKING' | 'SLEEP_TOOL' | 'SUBSCRIPTION' | 'JOURNAL' | 'EMERGENCY_CHAT' | 'FADFADA';

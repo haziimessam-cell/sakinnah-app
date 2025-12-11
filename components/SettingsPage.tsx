@@ -2,7 +2,7 @@
 import React, { useRef, useState } from 'react';
 import { User, Language } from '../types';
 import { translations } from '../translations';
-import { ArrowRight, ArrowLeft, Bell, Trash2, Shield, LogOut, Globe, Download, Cloud, Upload, Lock, ShieldCheck, ToggleLeft, ToggleRight, Mic, Phone } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Bell, Trash2, Shield, LogOut, Globe, Download, Cloud, Upload, Lock, ShieldCheck, ToggleLeft, ToggleRight, Mic, Phone, CircleAlert } from 'lucide-react';
 import { syncService } from '../services/syncService';
 import PinLock from './PinLock';
 
@@ -37,10 +37,10 @@ const SettingsPage: React.FC<Props> = ({ user, onBack, onLogout, language, setLa
   };
 
   const handleSyncPush = async () => {
-      if(confirm(language === 'ar' ? 'هل تريد رفع بياناتك إلى السحابة الآن؟' : 'Sync data to cloud now?')) {
+      if(confirm(t.confirmSync)) {
           const success = await syncService.pushToCloud(user.username);
-          if (success) alert(language === 'ar' ? 'تمت المزامنة بنجاح!' : 'Sync successful!');
-          else alert(language === 'ar' ? 'فشلت المزامنة. تأكد من اتصالك.' : 'Sync failed. Check connection.');
+          if (success) alert(t.syncSuccess);
+          else alert(t.syncFail);
       }
   };
 
@@ -64,16 +64,16 @@ const SettingsPage: React.FC<Props> = ({ user, onBack, onLogout, language, setLa
       const file = e.target.files?.[0];
       if (!file) return;
 
-      if (window.confirm(language === 'ar' ? 'استعادة النسخة الاحتياطية سيستبدل البيانات الحالية. هل أنت متأكد؟' : 'Restoring will overwrite current data. Continue?')) {
+      if (window.confirm(t.confirmRestore)) {
           setIsRestoring(true);
           const success = await syncService.restoreBackup(file);
           setIsRestoring(false);
           
           if (success) {
-              alert(language === 'ar' ? 'تمت الاستعادة بنجاح! سيتم إعادة تحميل التطبيق.' : 'Restore successful! App will reload.');
+              alert(t.restoreSuccess);
               window.location.reload();
           } else {
-              alert(language === 'ar' ? 'فشل الملف. تأكد من أنه ملف سكينة صالح.' : 'Invalid file format.');
+              alert(t.invalidFile);
           }
       }
   };
@@ -141,20 +141,20 @@ const SettingsPage: React.FC<Props> = ({ user, onBack, onLogout, language, setLa
                       <Cloud size={24} />
                   </div>
                   <div>
-                      <h3 className="font-bold text-lg">{language === 'ar' ? 'المزامنة السحابية' : 'Cloud Sync'}</h3>
+                      <h3 className="font-bold text-lg">{t.syncCloud}</h3>
                       <p className="text-blue-100 text-xs flex items-center gap-1">
                           <Shield size={10} /> 
-                          {language === 'ar' ? 'مشفر طرف-إلى-طرف (HIPAA)' : 'End-to-End Encrypted (HIPAA)'}
+                          {t.encrypted}
                       </p>
                   </div>
               </div>
 
               <div className="mt-4 pt-4 border-t border-white/20 flex justify-between items-center">
                    <div className="text-xs text-blue-100">
-                       {language === 'ar' ? 'الحالة: نشط' : 'Status: Active'}
+                       {t.statusActive}
                    </div>
                    <button onClick={handleSyncPush} className="bg-white text-blue-600 px-4 py-2 rounded-lg text-xs font-bold shadow-sm hover:bg-blue-50 transition-colors">
-                       {language === 'ar' ? 'مزامنة الآن' : 'Sync Now'}
+                       {t.syncNow}
                    </button>
               </div>
           </div>
@@ -186,9 +186,9 @@ const SettingsPage: React.FC<Props> = ({ user, onBack, onLogout, language, setLa
                       className="w-full accent-purple-600 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                    />
                    <div className="flex justify-between text-[10px] text-gray-400 mt-1 px-1">
-                       <span>{language === 'ar' ? 'بطيء' : 'Slow'}</span>
-                       <span>{language === 'ar' ? 'طبيعي' : 'Normal'}</span>
-                       <span>{language === 'ar' ? 'سريع' : 'Fast'}</span>
+                       <span>{t.slow}</span>
+                       <span>{t.normal}</span>
+                       <span>{t.fast}</span>
                    </div>
                </div>
 
@@ -274,10 +274,10 @@ const SettingsPage: React.FC<Props> = ({ user, onBack, onLogout, language, setLa
                           </div>
                           <div className="text-start">
                               <span className="text-gray-700 font-medium group-hover:text-emerald-600 transition-colors block">
-                                  {language === 'ar' ? 'نسخ احتياطي (ملف)' : 'Backup to File'}
+                                  {t.backupFile}
                               </span>
                               <span className="text-[10px] text-gray-400">
-                                  {lastBackup ? (language === 'ar' ? 'تم الحفظ مؤخراً' : 'Last saved just now') : (language === 'ar' ? 'حفظ نسخة مشفرة' : 'Save encrypted copy')}
+                                  {lastBackup ? t.lastSaved : t.saveEncrypted}
                               </span>
                           </div>
                       </div>
@@ -290,10 +290,10 @@ const SettingsPage: React.FC<Props> = ({ user, onBack, onLogout, language, setLa
                           </div>
                           <div className="text-start">
                               <span className="text-gray-700 font-medium group-hover:text-amber-600 transition-colors block">
-                                  {isRestoring ? (language === 'ar' ? 'جاري الاستعادة...' : 'Restoring...') : (language === 'ar' ? 'استعادة نسخة' : 'Restore Backup')}
+                                  {isRestoring ? t.restoreing : t.restoreBackup}
                               </span>
                               <span className="text-[10px] text-gray-400">
-                                  {language === 'ar' ? 'من ملف .sakinnah' : 'From .sakinnah file'}
+                                  {t.fromFile}
                               </span>
                           </div>
                       </div>

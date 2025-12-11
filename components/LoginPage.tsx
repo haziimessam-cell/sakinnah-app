@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Gender, Language } from '../types';
 import { translations } from '../translations';
 import { supabase } from '../services/supabaseClient';
-import { Mail, Lock, User as UserIcon, Calendar, ArrowLeft, ArrowRight, Eye, EyeOff, CheckCircle2, AlertCircle, Globe, Fingerprint, Sprout } from 'lucide-react';
+import { Mail, Lock, User as UserIcon, Calendar, ArrowLeft, ArrowRight, Eye, EyeOff, CircleCheck, CircleAlert, Globe, Fingerprint, Sprout } from 'lucide-react';
 
 interface Props {
   onLogin: (user: User) => void;
@@ -178,7 +178,7 @@ const LoginPage: React.FC<Props> = ({ onLogin, language, setLanguage }) => {
              
              {errorMsg && (
                  <div className="bg-red-50 text-red-500 text-xs p-3 rounded-xl mb-4 flex items-center gap-2">
-                     <AlertCircle size={16} /> {errorMsg}
+                     <CircleAlert size={16} /> {errorMsg}
                  </div>
              )}
 

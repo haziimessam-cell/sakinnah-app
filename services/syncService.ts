@@ -6,89 +6,155 @@ export const syncService = {
     
     // --- AUTH ---
     async getUser() {
-        const { data: { user } } = await supabase.auth.getUser();
-        return user;
+        try {
+            const { data, error } = await supabase.auth.getUser();
+            if (error || !data) return null;
+            return data.user;
+        } catch (e) {
+            console.warn("Auth check failed (Demo mode active)", e);
+            return null;
+        }
     },
 
     // --- JOURNALS ---
     async saveJournalEntry(entry: JournalEntry) {
-        const user = await this.getUser();
-        if (!user) return false;
+        try {
+            const user = await this.getUser();
+            if (!user) return false;
 
-        const { error } = await supabase
-            .from('journals')
-            .upsert({
-                id: entry.id, // Use local ID to prevent dupes if UUID compatible, else let Supabase gen
-                user_id: user.id,
-                content: entry.text,
-                sentiment: entry.sentiment,
-                created_at: entry.date
-            }, { onConflict: 'id' });
-        
-        return !error;
+            const { error } = await supabase
+                .from('journals')
+                .upsert({
+                    id: entry.id, 
+                    user_id: user.id,
+                    content: entry.text,
+                    sentiment: entry.sentiment,
+                    created_at: entry.date
+                }, { onConflict: 'id' });
+            
+            return !error;
+        } catch (e) {
+            console.error("Save Journal Error", e);
+            return false;
+        }
     },
 
     // --- CHAT HISTORY ---
     async saveChatSession(category: string, messages: Message[]) {
-        const user = await this.getUser();
-        if (!user) return false;
+        try {
+            const user = await this.getUser();
+            if (!user) return false;
 
-        // Upsert chat session
-        const { error } = await supabase
-            .from('chats')
-            .upsert({
-                user_id: user.id,
-                category: category,
-                messages: messages, // Supabase handles JSONB
-                updated_at: new Date()
-            }, { onConflict: 'user_id, category' }); // Requires unique constraint on (user_id, category) in DB
+            const { error } = await supabase
+                .from('chats')
+                .upsert({
+                    user_id: user.id,
+                    category: category,
+                    messages: messages,
+                    updated_at: new Date()
+                }, { onConflict: 'user_id, category' });
 
-        return !error;
+            return !error;
+        } catch (e) {
+            console.error("Save Chat Error", e);
+            return false;
+        }
     },
 
     // --- MOODS ---
     async saveMoodEntry(mood: string, value: number) {
-        const user = await this.getUser();
-        if (!user) return false;
+        try {
+            const user = await this.getUser();
+            if (!user) return false;
 
-        const { error } = await supabase
-            .from('moods')
-            .insert({
-                user_id: user.id,
-                mood: mood,
-                value: value,
-                created_at: new Date()
-            });
-        return !error;
+            const { error } = await supabase
+                .from('moods')
+                .insert({
+                    user_id: user.id,
+                    mood: mood,
+                    value: value,
+                    created_at: new Date()
+                });
+            return !error;
+        } catch (e) {
+            console.error("Save Mood Error", e);
+            return false;
+        }
+    },
+
+    // --- SUBSCRIPTION SECURITY (Anti-Hack) ---
+    async validateSubscription(username: string): Promise<boolean> {
+        try {
+            // 1. Try to get user from auth session first (Most Secure)
+            const user = await this.getUser();
+            let query = supabase.from('profiles').select('isSubscribed');
+            
+            if (user) {
+                query = query.eq('id', user.id);
+            } else {
+                // Fallback to username search if auth session missing (e.g. local user only)
+                query = query.eq('username', username);
+            }
+            
+            const { data, error } = await query.single();
+            
+            if (error || !data) return false;
+            return !!data.isSubscribed;
+        } catch (e) {
+            console.warn("Subscription validation failed (Network/Auth error)", e);
+            return false;
+        }
+    },
+
+    async upgradeSubscription(): Promise<boolean> {
+        try {
+            const user = await this.getUser();
+            if (!user) return false;
+
+            // Try RPC first (Secure Server-Side Logic)
+            const { error } = await supabase.rpc('activate_pro_subscription', { target_user_id: user.id });
+            
+            if (error) {
+                console.warn("RPC failed, attempting direct update (Demo Fallback)...", error.message);
+                // Fallback (Only works if RLS allows update, usually blocked in Prod)
+                const { error: updateError } = await supabase
+                    .from('profiles')
+                    .update({ isSubscribed: true })
+                    .eq('id', user.id);
+                return !updateError;
+            }
+            return true;
+        } catch (e) {
+            console.error("Upgrade failed", e);
+            return false;
+        }
     },
 
     // --- CLOUD SYNC ENGINE ---
     async pushToCloud(username: string): Promise<boolean> {
-        const user = await this.getUser();
-        if (!user) return false;
-
         try {
+            const user = await this.getUser();
+            if (!user) return false;
+
             // 1. Sync Journals
             const localJournalsStr = localStorage.getItem('sakinnah_journal');
             if (localJournalsStr) {
                 const entries: JournalEntry[] = JSON.parse(localJournalsStr);
-                // We upsert all to ensure cloud is up to date
                 for (const entry of entries) {
                     await supabase.from('journals').upsert({
+                        id: entry.id, // Ensure ID is passed to avoid dupes
                         user_id: user.id,
                         content: entry.text,
                         sentiment: entry.sentiment,
                         created_at: entry.date
-                    });
+                    }, { onConflict: 'id' });
                 }
             }
 
             // 2. Sync Chats
-            // Iterate over all keys in localStorage to find chats
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
                 if (key && key.startsWith('sakinnah_chat_')) {
-                    // key format: sakinnah_chat_CATEGORY_LANG
                     const parts = key.split('_');
                     if (parts.length >= 4) {
                         const category = parts[2];
@@ -98,9 +164,6 @@ export const syncService = {
                 }
             }
 
-            // 3. Sync Moods (Optimistic - just push new ones if we tracked ID, but for now just push latest logic or skip bulk sync to avoid dupes if not tracked. 
-            // Better strategy: The app pushes immediately on creation. This generic push is a fallback.)
-            
             return true;
         } catch (e) {
             console.error("Sync Push Error", e);
@@ -109,27 +172,23 @@ export const syncService = {
     },
     
     async syncWithCloud(username: string): Promise<'pushed' | 'pulled' | 'error'> {
-        const user = await this.getUser();
-        if (!user) return 'error';
-
         try {
+            const user = await this.getUser();
+            if (!user) return 'error';
+
             // 1. Pull Chats
-            const { data: chats } = await supabase.from('chats').select('*').eq('user_id', user.id);
-            if (chats) {
+            const { data: chats, error: chatError } = await supabase.from('chats').select('*').eq('user_id', user.id);
+            if (!chatError && chats) {
                 chats.forEach((chat: any) => {
-                    // Determine language from local setting or default to 'ar'
                     const lang = localStorage.getItem('sakinnah_lang') || 'ar';
                     const key = `sakinnah_chat_${chat.category}_${lang}`;
-                    
-                    // Simple merge: if cloud is newer or local is empty, overwrite
-                    // For a robust app, we'd merge message arrays by ID.
                     localStorage.setItem(key, JSON.stringify(chat.messages));
                 });
             }
 
             // 2. Pull Journals
-            const { data: journals } = await supabase.from('journals').select('*').eq('user_id', user.id);
-            if (journals) {
+            const { data: journals, error: journalError } = await supabase.from('journals').select('*').eq('user_id', user.id);
+            if (!journalError && journals) {
                 const mappedJournals: JournalEntry[] = journals.map((j: any) => ({
                     id: j.id || Date.now().toString(),
                     date: j.created_at,
@@ -140,9 +199,9 @@ export const syncService = {
                 localStorage.setItem('sakinnah_journal', JSON.stringify(mappedJournals));
             }
 
-            // 3. Pull Mood History for Chart
-            const { data: moods } = await supabase.from('moods').select('*').eq('user_id', user.id).order('created_at', {ascending: true});
-            if (moods) {
+            // 3. Pull Mood History
+            const { data: moods, error: moodError } = await supabase.from('moods').select('*').eq('user_id', user.id).order('created_at', {ascending: true});
+            if (!moodError && moods) {
                 const moodHistory = moods.map((m: any) => ({
                     value: m.value,
                     date: m.created_at,
@@ -151,6 +210,8 @@ export const syncService = {
                 localStorage.setItem('sakinnah_mood_history', JSON.stringify(moodHistory));
             }
 
+            // 4. Validate Subscription Status
+            const isSubscribed = await this.validateSubscription(username);
             return 'pulled';
         } catch (e) {
             console.error("Sync Pull Error", e);

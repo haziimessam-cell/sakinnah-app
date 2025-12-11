@@ -15,7 +15,7 @@ interface Props {
 
 const CategoryCard: React.FC<Props> = ({ category, onClick, onInfo, index, language }) => {
   const t = translations[language] as any;
-  const IconComponent = (Icons as any)[category.icon] || Icons.HelpCircle;
+  const IconComponent = (Icons as any)[category.icon] || Icons.CircleHelp;
   
   const titleKey = `cat_${category.id}_title`;
   const title = t[titleKey] || category.id;
@@ -25,10 +25,13 @@ const CategoryCard: React.FC<Props> = ({ category, onClick, onInfo, index, langu
       if (category.color.includes('rose')) return { bg: 'from-rose-500 to-pink-600', shadow: 'shadow-rose-300/50', glow: 'bg-rose-500' };
       if (category.color.includes('red')) return { bg: 'from-red-500 to-rose-600', shadow: 'shadow-red-300/50', glow: 'bg-red-500' };
       if (category.color.includes('teal')) return { bg: 'from-teal-500 to-emerald-600', shadow: 'shadow-teal-300/50', glow: 'bg-teal-500' };
+      if (category.color.includes('cyan')) return { bg: 'from-cyan-500 to-blue-600', shadow: 'shadow-cyan-300/50', glow: 'bg-cyan-500' };
       if (category.color.includes('blue')) return { bg: 'from-sky-500 to-blue-600', shadow: 'shadow-blue-300/50', glow: 'bg-blue-500' };
       if (category.color.includes('orange')) return { bg: 'from-orange-500 to-amber-600', shadow: 'shadow-orange-300/50', glow: 'bg-orange-500' };
+      if (category.color.includes('violet') || category.color.includes('fuchsia')) return { bg: 'from-violet-500 to-fuchsia-600', shadow: 'shadow-violet-300/50', glow: 'bg-violet-500' };
       if (category.color.includes('purple')) return { bg: 'from-violet-500 to-purple-600', shadow: 'shadow-purple-300/50', glow: 'bg-purple-500' };
       if (category.color.includes('indigo')) return { bg: 'from-indigo-500 to-blue-700', shadow: 'shadow-indigo-300/50', glow: 'bg-indigo-500' };
+      if (category.color.includes('lime') || category.color.includes('green')) return { bg: 'from-lime-500 to-green-600', shadow: 'shadow-lime-300/50', glow: 'bg-lime-500' };
       if (category.color.includes('slate')) return { bg: 'from-slate-500 to-gray-700', shadow: 'shadow-slate-300/50', glow: 'bg-slate-500' };
       return { bg: 'from-gray-700 to-gray-900', shadow: 'shadow-gray-300/50', glow: 'bg-gray-500' };
   };
