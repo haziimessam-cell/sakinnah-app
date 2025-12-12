@@ -1,24 +1,28 @@
-
-import { GoogleGenAI, Chat, GenerateContentResponse, Content } from "@google/genai";
+import { GoogleGenAI, Chat, GenerateContentResponse, Content, Part } from "@google/genai";
 import { SYSTEM_INSTRUCTION_AR, SYSTEM_INSTRUCTION_EN } from "../constants";
 import { Language } from "../types";
 
-/* 
-   ================================================================
-   DEPLOYMENT INSTRUCTIONS (FREE & SECURE):
-   ================================================================
-   ... (Same as before)
-*/
-
 let chatSession: Chat | null = null;
-let genAI: GoogleGenAI | null = null;
+let aiClient: GoogleGenAI | null = null;
 
-// Set this to your deployed backend URL for production security
-const PROXY_URL = ""; 
+// Securely access API key based on environment (Vite or standard process.env)
+// Note: In a real production app, use a proxy server. Client-side keys are risky.
+const getApiKey = () => {
+    // Check various env patterns
+    if (typeof process !== 'undefined' && process.env?.API_KEY) return process.env.API_KEY;
+    // Cast import.meta to any to avoid TS error: Property 'env' does not exist on type 'ImportMeta'
+    if (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_KEY) return (import.meta as any).env.VITE_API_KEY;
+    return process.env.API_KEY; // Fallback
+};
 
-// Local state for Proxy Mode (Stateless)
-let localHistory: Content[] = [];
-let localSystemInstruction: string = "";
+const apiKey = getApiKey();
+
+// Initialize the API Client
+if (apiKey) {
+    aiClient = new GoogleGenAI({ apiKey: apiKey });
+} else {
+    console.warn("⚠️ API_KEY is missing. AI features will not work.");
+}
 
 export const initializeChat = async (
   contextPrompt: string, 
@@ -31,24 +35,13 @@ export const initializeChat = async (
   const baseInstruction = baseInstructionOverride || defaultBase;
   const fullSystemInstruction = `${baseInstruction}\n\n[Context/Session Info]: ${contextPrompt}`;
 
-  // 1. PROXY MODE SETUP
-  if (PROXY_URL) {
-      localSystemInstruction = fullSystemInstruction;
-      // Reset history on new session init, or use provided
-      localHistory = history || [];
-      return { mock: true }; // Return mock object to satisfy caller
-  }
-
-  // 2. CLIENT-SIDE DEMO MODE
-  if (process.env.API_KEY) {
-      genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  if (aiClient) {
       try {
-        chatSession = genAI.chats.create({
+        chatSession = aiClient.chats.create({
           model: "gemini-2.5-flash",
           config: {
             systemInstruction: fullSystemInstruction,
             temperature: 0.7, 
-            maxOutputTokens: 2000,
           },
           history: history 
         });
@@ -59,13 +52,10 @@ export const initializeChat = async (
       }
   }
   
-  console.warn("No API Key or Proxy URL found. App will run in offline/preview mode.");
   return null;
 };
 
 export const sendMessageStreamToGemini = async function* (message: string, language: Language = 'ar') {
-  
-  // --- OPTION A: DIRECT CLIENT-SIDE CALL (DEMO) ---
   if (chatSession) {
     try {
         const result = await chatSession.sendMessageStream({ message });
@@ -80,78 +70,21 @@ export const sendMessageStreamToGemini = async function* (message: string, langu
     }
     return;
   }
-
-  // --- OPTION B: SECURE PROXY CALL (PRODUCTION) ---
-  if (PROXY_URL) {
-      try {
-          // Prepare payload: Message + History + System Instruction
-          const payload = {
-              message,
-              history: localHistory,
-              systemInstruction: localSystemInstruction
-          };
-
-          // Optimistic update of local history
-          localHistory.push({ role: 'user', parts: [{ text: message }] });
-
-          const response = await fetch(PROXY_URL, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-          });
-
-          if (!response.ok) throw new Error(`Proxy Error: ${response.status}`);
-          if (!response.body) throw new Error("No response body");
-
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let fullResponseText = "";
-
-          while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              const chunk = decoder.decode(value, { stream: true });
-              fullResponseText += chunk;
-              yield chunk;
-          }
-
-          // Update history with model response
-          localHistory.push({ role: 'model', parts: [{ text: fullResponseText }] });
-
-      } catch (error) {
-          console.error("Proxy Fetch Error:", error);
-          yield language === 'ar' ? "عذراً، الخادم لا يستجيب." : "Server error.";
-      }
-      return;
-  }
-
-  throw new Error("Configuration Error: No API Key or Proxy URL configured.");
+  
+  // Fallback if no API key
+  yield language === 'ar' ? "يرجى إضافة مفتاح API لتمكين المحادثة." : "Please add an API Key to enable chat.";
 };
 
-// --- NEW: Helper for single-turn tasks (Journal Analysis, etc.) ---
+// Helper for single-turn tasks (Journal Analysis, Memory Extraction)
 export const generateContent = async (prompt: string, systemInstruction?: string) => {
-    // Proxy Mode
-    if (PROXY_URL) {
+    if (aiClient) {
         try {
-            const response = await fetch(PROXY_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: prompt, systemInstruction }) // No history
-            });
-            if (!response.ok) throw new Error('Proxy Error');
-            return await response.text();
-        } catch(e) { return null; }
-    }
-    
-    // Client Mode
-    if (process.env.API_KEY) {
-        try {
-            const genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            const response = await genAI.models.generateContent({
+            const response = await aiClient.models.generateContent({
                 model: "gemini-2.5-flash",
                 contents: prompt,
                 config: {
-                    systemInstruction: systemInstruction
+                    systemInstruction: systemInstruction,
+                    responseMimeType: "application/json" // Force JSON for tools
                 }
             });
             return response.text;
@@ -163,22 +96,19 @@ export const generateContent = async (prompt: string, systemInstruction?: string
     return null;
 }
 
-// --- NEW: Embedding Generation for Vector Search ---
+// Embedding Generation for Vector Search (Memory)
 export const getEmbedding = async (text: string): Promise<number[] | null> => {
-    if (process.env.API_KEY) {
+    if (aiClient) {
         try {
-            const genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            // Using the latest embedding model
-            const response = await genAI.models.embedContent({
+            const response = await aiClient.models.embedContent({
                 model: 'text-embedding-004',
                 contents: text
             });
-            return response.embedding.values;
+            return response.embedding?.values || null;
         } catch (e) {
             console.error("Embedding Error", e);
             return null;
         }
     }
-    // Proxy fallback would be added here in production
     return null;
 };

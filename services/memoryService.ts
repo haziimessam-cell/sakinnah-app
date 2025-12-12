@@ -1,8 +1,6 @@
-
 import { Memory } from "../types";
 import { generateContent, getEmbedding } from "./geminiService";
 import { MEMORY_EXTRACTION_PROMPT } from "../constants";
-import { supabase } from "./supabaseClient";
 
 /**
  * ELEPHANT MEMORY SERVICE (Local Vector Store)
@@ -39,52 +37,68 @@ export const memoryService = {
     async extractAndSaveMemory(userText: string, username: string): Promise<void> {
         try {
             // 1. Ask Gemini to extract facts
-            const prompt = `${MEMORY_EXTRACTION_PROMPT}\nUser Text: "${userText}"`;
+            // We use a cleaner prompt format to ensure JSON validity
+            const prompt = `${MEMORY_EXTRACTION_PROMPT}\n\nUser Text to Analyze: "${userText}"`;
+            
             const jsonStr = await generateContent(prompt);
             
             if (!jsonStr) return;
 
-            // Clean JSON
+            // Clean JSON (remove markdown blocks if present)
             const cleanJson = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim();
-            let memories: Partial<Memory>[] = [];
+            
+            let memories: any[] = [];
             try {
                 memories = JSON.parse(cleanJson);
             } catch (e) {
+                console.warn("Failed to parse memory JSON", e);
                 return;
             }
 
             if (!Array.isArray(memories) || memories.length === 0) return;
 
-            console.log("🐘 Memories Extracted:", memories);
+            console.log("🧠 Extracted Facts:", memories);
 
             // 2. Load Existing Memories
-            const existingMemoriesStr = localStorage.getItem(`sakinnah_memories_${username}`);
+            const key = `sakinnah_memories_${username}`;
+            const existingMemoriesStr = localStorage.getItem(key);
             let existingMemories: Memory[] = existingMemoriesStr ? JSON.parse(existingMemoriesStr) : [];
 
             // 3. Process and Embed new memories
             for (const m of memories) {
-                // Deduplication: Simple content check
-                const isDuplicate = existingMemories.some(em => em.content.toLowerCase().includes(m.content?.toLowerCase() || '###'));
+                // Deduplication: Check if content already exists
+                const isDuplicate = existingMemories.some(em => 
+                    em.content.toLowerCase().includes(m.content?.toLowerCase()) || 
+                    (m.content?.toLowerCase().includes(em.content.toLowerCase()))
+                );
                 
                 if (!isDuplicate && m.content) {
                     // Generate Embedding
                     const embedding = await getEmbedding(m.content);
                     
-                    const newMemory: Memory = {
-                        id: Date.now().toString() + Math.random(),
-                        content: m.content || '',
-                        tags: m.tags || [],
-                        importance: m.importance || 1,
-                        timestamp: new Date().toISOString(),
-                        embedding: embedding || undefined
-                    };
-                    existingMemories.push(newMemory);
+                    if (embedding) {
+                        const newMemory: Memory = {
+                            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                            content: m.content,
+                            tags: m.tags || [],
+                            importance: m.importance || 1,
+                            timestamp: new Date().toISOString(),
+                            embedding: embedding
+                        };
+                        existingMemories.push(newMemory);
+                    }
                 }
             }
 
             // 4. Save to Storage
-            // Note: localStorage has 5MB limit. In production, move to Supabase/IndexedDB.
-            localStorage.setItem(`sakinnah_memories_${username}`, JSON.stringify(existingMemories));
+            // Limit to last 50 memories to prevent localStorage overflow
+            if (existingMemories.length > 50) {
+                // Sort by importance, then date, keep top 50
+                existingMemories.sort((a, b) => b.importance - a.importance);
+                existingMemories = existingMemories.slice(0, 50);
+            }
+            
+            localStorage.setItem(key, JSON.stringify(existingMemories));
 
         } catch (e) {
             console.error("Memory Extraction Failed", e);
@@ -97,7 +111,8 @@ export const memoryService = {
      * Finds relevant memories based on semantic similarity to the user's current input.
      */
     async retrieveRelevantMemories(userText: string, username: string): Promise<string> {
-        const stored = localStorage.getItem(`sakinnah_memories_${username}`);
+        const key = `sakinnah_memories_${username}`;
+        const stored = localStorage.getItem(key);
         if (!stored) return "";
 
         const memories: Memory[] = JSON.parse(stored);
@@ -106,17 +121,21 @@ export const memoryService = {
         // 1. Generate Embedding for current query
         const queryEmbedding = await getEmbedding(userText);
 
-        // Fallback to simple Keyword matching if embedding fails or not available
+        // Fallback to simple Keyword matching if embedding fails
         if (!queryEmbedding) {
-            console.warn("⚠️ Embedding failed, falling back to keyword search.");
-            const userTokens = userText.toLowerCase().split(/\s+/).filter(t => t.length > 2);
+            const userTokens = userText.toLowerCase().split(/\s+/).filter(t => t.length > 3);
             const keywordMatches = memories.filter(mem => {
-                return userTokens.some(token => mem.content.toLowerCase().includes(token) || mem.tags.some(tag => tag.includes(token)));
+                return userTokens.some(token => 
+                    mem.content.toLowerCase().includes(token) || 
+                    mem.tags.some(tag => tag.toLowerCase().includes(token))
+                );
             });
-            const criticalMemories = memories.filter(mem => mem.importance === 5);
+            // Also include high importance memories always
+            const criticalMemories = memories.filter(mem => mem.importance >= 4);
             const final = [...new Set([...keywordMatches, ...criticalMemories])];
+            
             if (final.length === 0) return "";
-            return `\n[LONG_TERM_MEMORY (Keyword Fallback)]:\n${final.map(m => `- ${m.content}`).join('\n')}\n`;
+            return `\n[LONG_TERM_MEMORY (Keyword Match)]:\n${final.map(m => `- ${m.content}`).join('\n')}\n`;
         }
 
         // 2. Vector Search (Cosine Similarity)
@@ -129,22 +148,25 @@ export const memoryService = {
         });
 
         // 3. Filter and Sort
-        // Threshold 0.5 usually implies moderate relevance in semantic space
+        // Threshold 0.6 implies good semantic relevance
         const relevant = scoredMemories
-            .filter(item => item.score > 0.5) 
+            .filter(item => item.score > 0.55) 
             .sort((a, b) => b.score - a.score)
-            .slice(0, 5) // Top 5 relevant facts
+            .slice(0, 4) // Top 4 relevant facts
             .map(item => item.mem);
 
-        // Always include Critical facts (e.g. medical info, major trauma) even if low similarity
+        // Always include Critical facts (importance 5) to ensure safety/context
         const critical = memories.filter(m => m.importance === 5);
-        const uniqueMemories = [...new Set([...relevant, ...critical])];
+        
+        // Merge and Dedupe
+        const uniqueMemories = Array.from(new Set([...relevant, ...critical].map(m => m.id)))
+            .map(id => [...relevant, ...critical].find(m => m.id === id));
 
         if (uniqueMemories.length === 0) return "";
 
         // Format for System Prompt
-        const memoryContext = uniqueMemories.map(m => `- [FACT]: ${m.content}`).join('\n');
+        const memoryContext = uniqueMemories.map(m => `- ${m?.content}`).join('\n');
         
-        return `\n[PERSONAL_KNOWLEDGE_BASE (Vector Match)]:\n${memoryContext}\n`;
+        return `\n[RECALLED_MEMORIES_FROM_VECTOR_DB]:\n${memoryContext}\n`;
     }
 };

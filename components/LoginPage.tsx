@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Gender, Language } from '../types';
 import { translations } from '../translations';
-import { supabase } from '../services/supabaseClient';
+import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 import { Mail, Lock, User as UserIcon, Calendar, ArrowLeft, ArrowRight, Eye, EyeOff, CircleCheck, CircleAlert, Globe, Fingerprint, Sprout } from 'lucide-react';
 
 interface Props {
@@ -55,6 +55,14 @@ const LoginPage: React.FC<Props> = ({ onLogin, language, setLanguage }) => {
 
   const handleAuth = async (e: React.FormEvent) => {
       e.preventDefault();
+      
+      // Check if backend is configured; if not, use demo mode immediately
+      if (!isSupabaseConfigured()) {
+          console.warn("Supabase not configured. Using demo mode.");
+          handleDemoLogin();
+          return;
+      }
+
       setLoading(true);
       setErrorMsg('');
 
@@ -100,14 +108,17 @@ const LoginPage: React.FC<Props> = ({ onLogin, language, setLanguage }) => {
       } catch (error: any) {
           console.error("Auth Error:", error);
           
+          const errMsg = error?.message?.toLowerCase() || '';
+
           // --- ROBUST FALLBACK FOR DEMO ENVIRONMENT ---
           // Automatically fall back to local demo mode on any fetch error or missing config
-          if (error.message && (
-              error.message.includes('fetch') || 
-              error.message.includes('Load failed') || 
-              error.message.includes('network') ||
-              error.message.includes('apikey')
-          )) {
+          if (
+              errMsg.includes('fetch') || 
+              errMsg.includes('load failed') || 
+              errMsg.includes('network') ||
+              errMsg.includes('apikey') ||
+              errMsg.includes('url')
+          ) {
               console.warn("Backend unreachable or unconfigured. Falling back to local demo mode.");
               handleDemoLogin();
               return; 
