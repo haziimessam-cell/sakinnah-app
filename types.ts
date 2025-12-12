@@ -33,7 +33,6 @@ export interface BookedSession {
   time: string;
   type: 'ai_guided' | 'human_expert';
   status: 'upcoming' | 'completed';
-  doctorName?: string;
 }
 
 export interface Category {
@@ -83,13 +82,18 @@ export interface TherapyPlan {
 
 export interface MonthlyReport {
   id: string;
-  month: string;
+  monthAr: string;
+  monthEn: string;
   childName: string;
-  diagnosis: string;
+  diagnosisAr: string;
+  diagnosisEn: string;
   progressScore: number; // 0-100
-  behavioralImprovements: string[];
-  academicRecommendations: string[];
-  socialSkillsStatus: string;
+  behavioralImprovementsAr: string[];
+  behavioralImprovementsEn: string[];
+  academicRecommendationsAr: string[];
+  academicRecommendationsEn: string[];
+  socialSkillsStatusAr: string;
+  socialSkillsStatusEn: string;
   clinicalNotes: string;
 }
 
@@ -126,6 +130,7 @@ export interface Memory {
     tags: string[]; // Keywords for retrieval (e.g., "work", "boss", "stress")
     importance: number; // 1-5
     timestamp: string;
+    embedding?: number[]; // Vector embedding for semantic search
 }
 
-export type ViewState = 'LOGIN' | 'HOME' | 'CHAT' | 'DISCLAIMER' | 'PROFILE' | 'SETTINGS' | 'HELP' | 'BREATHING' | 'GARDEN' | 'DREAM' | 'GROUNDING' | 'BOOKING' | 'SLEEP_TOOL' | 'SUBSCRIPTION' | 'JOURNAL' | 'EMERGENCY_CHAT' | 'FADFADA';
+export type ViewState = 'LOGIN' | 'HOME' | 'CHAT' | 'DISCLAIMER' | 'PROFILE' | 'SETTINGS' | 'HELP' | 'BREATHING' | 'GARDEN' | 'DREAM' | 'GROUNDING' | 'BOOKING' | 'SLEEP_TOOL' | 'SUBSCRIPTION' | 'JOURNAL' | 'EMERGENCY_CHAT' | 'FADFADA' | 'ASSESSMENT' | 'PLAN';

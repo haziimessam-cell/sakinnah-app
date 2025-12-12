@@ -1,13 +1,15 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { User, Message, Role, Category, Language } from '../types';
-import { sendMessageStreamToGemini, initializeChat } from '../services/geminiService';
+import { sendMessageStreamToGemini, initializeChat, generateContent } from '../services/geminiService';
 import { memoryService } from '../services/memoryService';
+import { ragService } from '../services/ragService'; // Import RAG Service
 import ChatInput from './ChatInput';
 import ChatMessage from './ChatMessage';
 import VoiceOverlay from './VoiceOverlay';
-import { ArrowLeft, ArrowRight, MoreVertical, Phone, Video, GripHorizontal } from 'lucide-react';
+import { ArrowLeft, ArrowRight, MoreVertical, Phone, Video, GripHorizontal, Baby, User as UserIcon, Apple, GlassWater, Moon, Gamepad2, Smile, Frown, AlertCircle, Heart, Link as LinkIcon, Clock, CalendarCheck } from 'lucide-react';
 import { translations } from '../translations';
+import { BARAEM_SYSTEM_INSTRUCTION_AR, BARAEM_SYSTEM_INSTRUCTION_EN, SESSION_CLOSING_PHRASES_AR, SESSION_CLOSING_PHRASES_EN } from '../constants';
 
 interface Props {
   user: User;
@@ -28,11 +30,36 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack }) =>
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   
+  // Session Timer State (40 minutes = 2400 seconds)
+  // For testing, you can reduce this, but per requirement it is 40 mins.
+  const SESSION_DURATION = 40 * 60; 
+  const [sessionTimeLeft, setSessionTimeLeft] = useState(SESSION_DURATION);
+  const [sessionActive, setSessionActive] = useState(true);
+
+  // Silence Breaker State
+  const silenceTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastUserInteractionRef = useRef<number>(Date.now());
+  
+  // Baraem Specific State
+  const isBaraem = category.id === 'baraem';
+  const [baraemMode, setBaraemMode] = useState<'child' | 'parent'>('child');
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const isCallModeRef = useRef(false);
   const synth = window.speechSynthesis;
   const userGender = user.gender;
+
+  const PECS_ITEMS = [
+      { id: 'hungry', icon: Apple, textAr: 'أنا جعان', textEn: 'I am hungry', color: 'bg-red-100 text-red-600' },
+      { id: 'thirsty', icon: GlassWater, textAr: 'عطشان', textEn: 'I am thirsty', color: 'bg-blue-100 text-blue-600' },
+      { id: 'sleepy', icon: Moon, textAr: 'عاوز أنام', textEn: 'I am tired', color: 'bg-indigo-100 text-indigo-600' },
+      { id: 'play', icon: Gamepad2, textAr: 'العب معايا', textEn: 'Lets play', color: 'bg-green-100 text-green-600' },
+      { id: 'happy', icon: Smile, textAr: 'مبسوط', textEn: 'Happy', color: 'bg-yellow-100 text-yellow-600' },
+      { id: 'sad', icon: Frown, textAr: 'زعلان', textEn: 'Sad', color: 'bg-gray-200 text-gray-600' },
+      { id: 'hurt', icon: AlertCircle, textAr: 'موجوع', textEn: 'I am hurt', color: 'bg-rose-100 text-rose-600' },
+      { id: 'love', icon: Heart, textAr: 'بحبك', textEn: 'I love you', color: 'bg-pink-100 text-pink-600' },
+  ];
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -46,219 +73,247 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack }) =>
             setAvailableVoices(voices);
         }
     };
-    
     loadVoices();
-    // Chrome/Android loads voices asynchronously
     if (window.speechSynthesis.onvoiceschanged !== undefined) {
         window.speechSynthesis.onvoiceschanged = loadVoices;
     }
-    
-    // Fallback: Retry every 500ms for 3 seconds if empty (common Android issue)
     const interval = setInterval(() => {
         if (synth.getVoices().length === 0) loadVoices();
         else clearInterval(interval);
     }, 500);
-
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    // Load Chat History
-    const chatKey = `sakinnah_chat_${category.id}_${language}`;
-    const saved = localStorage.getItem(chatKey);
-    if (saved) {
-        setMessages(JSON.parse(saved).map((m: any) => ({...m, timestamp: new Date(m.timestamp)})));
-    } else {
-        const greeting: Message = {
-            id: 'init',
-            role: Role.MODEL,
-            text: t.welcomeGreeting.replace('{name}', user.name).replace('{category}', t[`cat_${category.id}_title`] || category.id),
-            timestamp: new Date()
-        };
-        setMessages([greeting]);
-    }
-
-    const initGemini = async () => {
-        const systemInstruction = t[`cat_${category.id}_science`] || "";
-        
-        // Initial Retrieval: Get "General/Critical" memories
-        const memoryContext = memoryService.retrieveRelevantMemories("important family job health", user.username);
-        
-        const contextPrompt = `User: ${user.name}, Age: ${user.age}, Gender: ${user.gender}, Category: ${category.id}\n${memoryContext}`;
-        
-        // Inject specific persona name based on user gender
-        const personaName = user.gender === 'male' 
-            ? (language === 'ar' ? "Hannya (حنية)" : "Grace")
-            : (language === 'ar' ? "Sanad (سند)" : "Atlas");
-            
-        const fullPrompt = `${contextPrompt}\nYour Assigned Persona Name: ${personaName}`;
-
-        await initializeChat(fullPrompt, systemInstruction, undefined, language);
-    };
-    initGemini();
-
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SpeechRecognition) {
-        recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.continuous = false;
-        recognitionRef.current.lang = language === 'ar' ? 'ar-EG' : 'en-US';
-        recognitionRef.current.onresult = (event: any) => {
-            const transcript = event.results[0][0].transcript;
-            setInputText(prev => prev + ' ' + transcript);
-            setIsListening(false);
-        };
-        recognitionRef.current.onerror = () => setIsListening(false);
-        recognitionRef.current.onend = () => setIsListening(false);
-    }
-  }, [category.id, language, user, t]);
-
-  const saveMessages = (msgs: Message[]) => {
-      const chatKey = `sakinnah_chat_${category.id}_${language}`;
-      localStorage.setItem(chatKey, JSON.stringify(msgs));
-  };
-
-  // --- SMART VOICE SELECTION ALGORITHM ---
-  const getOptimalVoice = (lang: Language, gender: 'male' | 'female') => {
-      const targetGender = gender === 'male' ? 'female' : 'male'; // Therapist Persona
+  // Defined here to be used in handleSessionEnd
+  const getOptimalVoice = useCallback((lang: Language, gender: 'male' | 'female', isMamaMai: boolean = false) => {
+      const targetGender = isMamaMai ? 'female' : (gender === 'male' ? 'female' : 'male'); 
       const langPrefix = lang === 'ar' ? 'ar' : 'en';
-      
-      // Filter by language first
       const langVoices = availableVoices.filter(v => v.lang.startsWith(langPrefix));
-      
-      // PRIORITY 1: High Quality Cloud Voices (Google/Siri/Enhanced)
-      // These sound human on Android/iOS without tuning.
-      const premiumKeywords = ['Google', 'Siri', 'Enhanced', 'Premium', 'Natural'];
+      const premiumKeywords = ['Google', 'Siri', 'Enhanced', 'Premium', 'Natural', 'Online'];
       const premiumVoices = langVoices.filter(v => premiumKeywords.some(k => v.name.includes(k)));
+      const candidatePool = premiumVoices.length > 0 ? premiumVoices : langVoices;
 
-      // PRIORITY 2: Gender Matching within Premium
-      if (premiumVoices.length > 0) {
-          // Try to guess gender from name (e.g., "Google US English" is usually female, "Maged" is male)
+      if (candidatePool.length > 0) {
           if (lang === 'ar') {
               if (targetGender === 'female') {
-                  const femaleAr = premiumVoices.find(v => v.name.includes('Laila') || v.name.includes('Salma') || v.name.includes('Google')); // Google AR is usually female/neutral
-                  if (femaleAr) return { voice: femaleAr, isRobotic: false };
-              } else {
-                  const maleAr = premiumVoices.find(v => v.name.includes('Maged') || v.name.includes('Tarik'));
-                  if (maleAr) return { voice: maleAr, isRobotic: false };
-              }
-              return { voice: premiumVoices[0], isRobotic: false };
-          } else {
-              // English
-              if (targetGender === 'female') {
-                  const f = premiumVoices.find(v => v.name.includes('Samantha') || v.name.includes('Google US English'));
+                  const f = candidatePool.find(v => v.name.includes('Laila') || v.name.includes('Salma') || v.name.includes('Google')); 
                   if (f) return { voice: f, isRobotic: false };
               } else {
-                  const m = premiumVoices.find(v => v.name.includes('Daniel') || v.name.includes('Google UK English Male'));
+                  const m = candidatePool.find(v => v.name.includes('Maged') || v.name.includes('Tarik'));
                   if (m) return { voice: m, isRobotic: false };
               }
-              return { voice: premiumVoices[0], isRobotic: false };
+          } else {
+              if (targetGender === 'female') {
+                  const f = candidatePool.find(v => v.name.includes('Samantha') || v.name.includes('Google US') || v.name.includes('Female'));
+                  if (f) return { voice: f, isRobotic: false };
+              } else {
+                  const m = candidatePool.find(v => v.name.includes('Daniel') || v.name.includes('Google UK') || v.name.includes('Male'));
+                  if (m) return { voice: m, isRobotic: false };
+              }
           }
       }
-
-      // PRIORITY 3: Standard System Voices (Often Robotic)
-      // If we fall back here, we flag 'isRobotic' to apply pitch/rate tuning.
       return { voice: langVoices[0] || null, isRobotic: true };
-  };
-
-  const detectEmotion = (text: string) => {
-      const t = text.toLowerCase();
-      // Expanded Arabic/English emotion keywords
-      if (['wow', 'amazing', 'happy', 'love', 'haha', 'ya habibi', 'رائع', 'يا حبيبي', 'يا بطل', 'ممتاز', 'هاها'].some(k => t.includes(k))) return 'excited';
-      if (['sorry', 'sad', 'pain', 'hard', 'hurt', 'feel you', 'أسف', 'حزين', 'صعب', 'ألم', 'معلش', 'سلامة قلبك', 'حاسس بيك'].some(k => t.includes(k))) return 'empathetic';
-      if (['calm', 'breathe', 'relax', 'safe', 'okay', 'fine', 'هدي', 'اطمن', 'بخير', 'تنفس', 'أمان'].some(k => t.includes(k))) return 'reassuring';
-      if (['plan', 'step', 'goal', 'advice', 'listen', 'خطة', 'نصيحة', 'اسمع'].some(k => t.includes(k))) return 'serious';
-      if (['?', 'why', 'how', 'what', 'tell me', 'لماذا', 'كيف', 'إيه', 'احكيلي'].some(k => t.includes(k))) return 'curious';
-      return 'neutral';
-  };
+  }, [availableVoices]);
 
   const speakText = useCallback((text: string, forceCancel = true) => {
     if (forceCancel && synth.speaking) synth.cancel();
     
-    // Clean text: Remove markdown, emojis, and bracketed notes
-    const cleanText = text.replace(/[*_~`]/g, '').replace(/\[.*?\]/g, '').replace(/[^\p{L}\p{N}\s.,?!،؟]/gu, '');
-    
+    let cleanText = text
+        .replace(/[*#~`_]/g, '') 
+        .replace(/\[.*?\]/g, '') 
+        .replace(/\s+/g, ' '); 
+    cleanText = cleanText.replace(/([.?!,،؟])\s*/g, '$1 ');
+
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = language === 'ar' ? 'ar-EG' : 'en-US';
     
-    // Smart Selection
-    const { voice, isRobotic } = getOptimalVoice(language, userGender);
+    const isMamaMai = category.id === 'baraem';
+    const { voice, isRobotic } = getOptimalVoice(language, userGender, isMamaMai);
     if (voice) utterance.voice = voice;
 
-    const emotion = detectEmotion(text);
-    const targetVoiceGender = userGender === 'male' ? 'female' : 'male';
     const userSpeed = user.voiceSpeed || 1.0;
-
-    // --- DYNAMIC TUNING ENGINE ---
-    // Base settings based on Persona
     let pitch = 1.0;
     let rate = 1.0;
 
-    if (language === 'en') {
-        if (targetVoiceGender === 'female') { pitch = 1.1; rate = 0.95; } // Grace: Soft, slightly high
-        else { pitch = 0.9; rate = 0.95; } // Atlas: Deep, steady
+    const targetIsFemale = isMamaMai || userGender === 'male';
+
+    if (targetIsFemale) {
+        pitch = 1.1; 
+        rate = 0.95;
     } else {
-        if (targetVoiceGender === 'female') { pitch = 1.1; rate = 0.9; } // Hannya: Warm, motherly
-        else { pitch = 0.85; rate = 0.95; } // Sanad: Deep, protective
+        pitch = 0.85; 
+        rate = 0.9;
     }
 
-    // Emotion Modulation
-    switch (emotion) {
-        case 'empathetic': pitch -= 0.1; rate *= 0.85; break; // Sad/Warm -> Slower, Lower
-        case 'reassuring': pitch -= 0.05; rate *= 0.9; break; // Calm -> Steady
-        case 'excited': pitch += 0.15; rate *= 1.1; break; // Happy -> Higher, Faster
-        case 'curious': pitch += 0.05; break; // Question -> Slight tilt up
-        case 'serious': rate *= 0.95; pitch -= 0.05; break; // Serious -> Grounded
-    }
-
-    // ROBOTIC COMPENSATION
-    // If using a low-quality system voice, we must soften it.
     if (isRobotic) {
-        // Robotic voices are often too fast and metallic.
-        // Solution: Slow down significantly and lower pitch to add "body".
         rate *= 0.85; 
-        pitch *= 0.9;
-        
-        // Android specific hack: Android voices often ignore pitch if rate is too fast
-        if (rate > 0.9) rate = 0.9; 
+        pitch *= 0.95;
     }
 
-    // Apply User Preference
     utterance.pitch = Math.max(0.5, Math.min(2, pitch));
     utterance.rate = Math.max(0.5, Math.min(2, rate * userSpeed));
+    utterance.volume = 1.0;
 
     utterance.onstart = () => setIsSpeaking(true);
+    
     utterance.onend = () => { 
         setIsSpeaking(false); 
-        if (isCallModeRef.current && recognitionRef.current) { 
-            try { recognitionRef.current.start(); setIsListening(true); } catch(e) {} 
+        if (isCallModeRef.current && recognitionRef.current && sessionActive) { 
+            setTimeout(() => {
+                try { 
+                    recognitionRef.current.start(); 
+                    setIsListening(true); 
+                } catch(e) { console.error(e); }
+            }, 300); 
         } 
     };
     
     synth.speak(utterance);
-  }, [language, userGender, availableVoices, user.voiceSpeed]);
+  }, [language, userGender, getOptimalVoice, user.voiceSpeed, category.id, sessionActive]);
 
-  const handleSendMessage = async () => {
-      if (!inputText.trim()) return;
-      const userMsg: Message = { id: Date.now().toString(), role: Role.USER, text: inputText, timestamp: new Date() };
-      setMessages(prev => [...prev, userMsg]);
+  // --- SESSION END LOGIC ---
+  const handleSessionEnd = useCallback(() => {
+      setSessionActive(false);
       
-      // --- LONG TERM MEMORY INJECTION ---
-      // 1. Search for relevant memories based on what user just typed
-      const relevantMemories = memoryService.retrieveRelevantMemories(inputText, user.username);
+      // Stop listening/recording if active
+      if (recognitionRef.current) recognitionRef.current.stop();
+      setIsListening(false);
+
+      // Pick a gentle phrase
+      const phrases = language === 'ar' ? SESSION_CLOSING_PHRASES_AR : SESSION_CLOSING_PHRASES_EN;
+      const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)];
+
+      // Inject the message from the model
+      const closingMsg: Message = {
+          id: 'closing-' + Date.now(),
+          role: Role.MODEL,
+          text: randomPhrase,
+          timestamp: new Date()
+      };
       
-      // 2. Prepend invisible context for the AI
-      // The user won't see this, but the AI will.
-      let textToProcess = inputText;
-      if (relevantMemories) {
-          textToProcess = `${relevantMemories}\n\n[USER_MESSAGE]: ${inputText}`;
-          console.log("🐘 Context Injected:", relevantMemories.length);
+      setMessages(prev => {
+          const updated = [...prev, closingMsg];
+          // Save to local storage immediately
+          const chatKey = `sakinnah_chat_${category.id}_${language}`;
+          localStorage.setItem(chatKey, JSON.stringify(updated));
+          return updated;
+      });
+
+      // Speak it gently
+      speakText(randomPhrase);
+
+  }, [language, category.id, speakText]);
+
+  // --- SESSION TIMER LOGIC ---
+  useEffect(() => {
+      const timer = setInterval(() => {
+          setSessionTimeLeft(prev => {
+              if (prev <= 1) {
+                  clearInterval(timer);
+                  handleSessionEnd(); // Trigger end protocol
+                  return 0;
+              }
+              return prev - 1;
+          });
+      }, 1000);
+      return () => clearInterval(timer);
+  }, [handleSessionEnd]);
+
+  const formatTime = (seconds: number) => {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getTimerColor = () => {
+      if (sessionTimeLeft > 600) return 'text-primary-600 bg-primary-50 border-primary-100'; // > 10 mins
+      if (sessionTimeLeft > 300) return 'text-orange-600 bg-orange-50 border-orange-100'; // > 5 mins
+      if (sessionTimeLeft <= 0) return 'text-gray-400 bg-gray-100 border-gray-200'; // Finished
+      return 'text-red-600 bg-red-50 border-red-100 animate-pulse'; // < 5 mins
+  };
+
+  const getProgressWidth = () => {
+      return (sessionTimeLeft / SESSION_DURATION) * 100;
+  };
+
+  // --- SILENCE BREAKER & INTERACTION TRACKING ---
+  const resetSilenceTimer = useCallback(() => {
+      lastUserInteractionRef.current = Date.now();
+      if (silenceTimerRef.current) clearInterval(silenceTimerRef.current);
+      
+      if (synth.speaking) {
+          synth.cancel();
+          setIsSpeaking(false);
       }
 
-      setInputText('');
+      silenceTimerRef.current = setInterval(async () => {
+          if (isCallModeRef.current && !isSpeaking && !isStreaming && !isListening && sessionActive) {
+              const now = Date.now();
+              if (now - lastUserInteractionRef.current > 25000) {
+                  const nudgePrompt = language === 'ar' 
+                    ? "المستخدم صامت منذ فترة. قل جملة قصيرة جداً (كلمتين أو ثلاث) للاطمئنان عليه." 
+                    : "User has been silent. Say a very short phrase to check in.";
+                  
+                  const nudge = await generateContent(nudgePrompt); 
+                  if (nudge) {
+                      speakText(nudge);
+                  }
+                  lastUserInteractionRef.current = Date.now();
+              }
+          }
+      }, 5000);
+  }, [language, isSpeaking, isStreaming, isListening, sessionActive, speakText]);
+
+  useEffect(() => {
+      resetSilenceTimer();
+      return () => {
+          if (silenceTimerRef.current) clearInterval(silenceTimerRef.current);
+      };
+  }, [resetSilenceTimer]);
+
+  // --- HANDLE SEND MESSAGE ---
+  const handleSendMessage = useCallback(async (forcedText?: string, isSystemTrigger: boolean = false) => {
+      if (!sessionActive && !isSystemTrigger) return;
+
+      const textToSend = forcedText || inputText;
+      if (!textToSend.trim()) return;
+      
+      resetSilenceTimer(); // User is active
+
+      if (!isSystemTrigger) {
+          const userMsg: Message = { id: Date.now().toString(), role: Role.USER, text: textToSend, timestamp: new Date() };
+          setMessages(prev => [...prev, userMsg]);
+          if (!forcedText) setInputText('');
+      }
+      
       setIsStreaming(true);
 
-      // Extract new facts in background
-      memoryService.extractAndSaveMemory(inputText, user.username);
+      // --- 1. RETRIEVE CONTEXT (Memories + Clinical RAG) ---
+      // Long-Term Memory (Personal Facts)
+      const relevantMemories = isSystemTrigger ? "" : await memoryService.retrieveRelevantMemories(textToSend, user.username);
+      // RAG (Clinical Protocols)
+      const clinicalContext = ragService.retrieveContext(textToSend, language);
+      
+      let textToProcess = textToSend;
+      let contextInjection = relevantMemories;
+
+      if (clinicalContext) {
+          contextInjection += `\n\n${clinicalContext}`;
+      }
+
+      if (isBaraem) {
+          contextInjection += `\n[CURRENT_INTERACTION_MODE]: ${baraemMode.toUpperCase()} (Adjust tone accordingly: Simple/Playful for CHILD, Professional/Supportive for PARENT).`;
+      }
+
+      if (contextInjection) {
+          // Structure the prompt so the model knows what is Memory vs Current Input
+          textToProcess = `${contextInjection}\n\n[USER_CURRENT_MESSAGE]: ${textToSend}`;
+      }
+
+      if (!isSystemTrigger) {
+          // Extract new facts in background
+          memoryService.extractAndSaveMemory(textToSend, user.username);
+      }
 
       try {
           const stream = sendMessageStreamToGemini(textToProcess, language);
@@ -270,11 +325,133 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack }) =>
               aiText += chunk;
               setMessages(prev => prev.map(m => m.id === aiMsgId ? { ...m, text: aiText } : m));
           }
-          const finalMessages = [...messages, userMsg, { id: aiMsgId, role: Role.MODEL, text: aiText, timestamp: new Date() }];
-          saveMessages(finalMessages);
-          if (isCallModeRef.current) speakText(aiText);
-      } catch (e) { console.error(e); } finally { setIsStreaming(false); }
-  };
+          
+          setMessages(prev => {
+              const finalMessages = [...prev];
+              const chatKey = `sakinnah_chat_${category.id}_${language}`;
+              localStorage.setItem(chatKey, JSON.stringify(finalMessages));
+              return finalMessages;
+          });
+          
+          if (isCallModeRef.current || (isBaraem && baraemMode === 'child')) {
+              speakText(aiText);
+          }
+      } catch (e) { 
+          console.error(e); 
+      } finally { 
+          setIsStreaming(false); 
+      }
+  }, [inputText, isBaraem, baraemMode, language, messages, user.username, resetSilenceTimer, sessionActive, category.id, speakText]);
+
+  useEffect(() => {
+    // Load Chat History
+    const chatKey = `sakinnah_chat_${category.id}_${language}`;
+    const saved = localStorage.getItem(chatKey);
+    let hasHistory = false;
+    let lastModelMessage = "";
+
+    if (saved) {
+        const loadedMsgs = JSON.parse(saved).map((m: any) => ({...m, timestamp: new Date(m.timestamp)}));
+        if (loadedMsgs.length > 0) {
+            setMessages(loadedMsgs);
+            hasHistory = true;
+            const lastModel = loadedMsgs.filter((m: any) => m.role === Role.MODEL).pop();
+            if (lastModel) lastModelMessage = lastModel.text;
+        }
+    } 
+    
+    const initGemini = async () => {
+        try {
+            let systemInstruction = t[`cat_${category.id}_science`] || "";
+            if (category.id === 'baraem') {
+                systemInstruction = language === 'ar' ? BARAEM_SYSTEM_INSTRUCTION_AR : BARAEM_SYSTEM_INSTRUCTION_EN;
+            }
+            
+            let partnerContext = "";
+            if (category.id === 'relationships') {
+                if (user.partner) {
+                    partnerContext = language === 'ar' 
+                      ? `\n[RELATIONSHIP_CONTEXT]: المستخدم مرتبط بشريك اسمه "${user.partner}". عند تقديم النصيحة، خذ هذا في الاعتبار.` 
+                      : `\n[RELATIONSHIP_CONTEXT]: User has a partner named "${user.partner}". Consider this dyadic dynamic.`;
+                }
+            }
+
+            let resumeContext = "";
+            if (hasHistory && !isBaraem) {
+                resumeContext = language === 'ar'
+                    ? `\n[RESUME_SESSION]: هذه جلسة مستمرة. لقد توقفنا في الجلسة السابقة عند: "${lastModelMessage.substring(0, 100)}...". من فضلك لا تبدأ من الصفر (لا تسأل عن الاسم أو المشكلة مجدداً إذا كانت معروفة). أكمل البرنامج العلاجي وانتقل للخطوة التالية منطقياً.`
+                    : `\n[RESUME_SESSION]: Ongoing session. Last stopped at: "${lastModelMessage.substring(0, 100)}...". Do NOT restart intake. Resume therapy plan sequentially.`;
+            }
+
+            // Retrieve High-Importance Memories for Context Initialization
+            const memoryContext = await memoryService.retrieveRelevantMemories("important family job health partner", user.username);
+            
+            let personaName = "";
+            let personaTraits = "";
+
+            if (category.id === 'baraem') {
+                personaName = language === 'ar' ? "Mama Mai (ماما مي)" : "Mama Mai";
+                personaTraits = "You are a warm, specialized motherly figure.";
+            } else {
+                if (user.gender === 'male') {
+                    personaName = language === 'ar' ? "Hannya (حنية)" : "Grace";
+                    personaTraits = language === 'ar' 
+                        ? "أنت طبيبة نفسية اسمها 'حنية'. صفاتك: رقيقة جداً، صوتك دافئ، صبورة، ومحتوية."
+                        : "You are a female therapist named Grace. Traits: Gentle, soft-spoken, containing.";
+                } else {
+                    personaName = language === 'ar' ? "Sanad (سند)" : "Atlas";
+                    personaTraits = language === 'ar'
+                        ? "أنت طبيب نفسى اسمه 'سند'. صفاتك: حكيم، رزين، صوتك عميق ومطمئن."
+                        : "You are a male therapist named Atlas. Traits: Wise, steady, protective.";
+                }
+            }
+            
+            const contextPrompt = `User Info: Name=${user.name}, Age=${user.age}, Gender=${user.gender}, Category=${category.id}\n${partnerContext}\n${resumeContext}\n${memoryContext}`;
+            const fullPrompt = `${contextPrompt}\n\n[YOUR PERSONA]:\nName: ${personaName}\nTraits: ${personaTraits}\n\nImportant: Always stay in character based on these traits. Follow the sequential therapy protocol.`;
+
+            await initializeChat(fullPrompt, systemInstruction, undefined, language);
+
+            if (!hasHistory && !isBaraem) {
+                const intakeTrigger = language === 'ar'
+                    ? `[SYSTEM_TRIGGER]: المستخدم دخل العيادة الآن. تصرف كطبيب محترف. رحب به، تأكد من اسمه وسنه (أنت تعرفهم من الملف)، ثم اسأله سؤالاً طبياً واحداً لبدء التشخيص في قسم ${t[`cat_${category.id}_title`]}.`
+                    : `[SYSTEM_TRIGGER]: User entered. Act as a doctor. Welcome them, verify Name/Age, and ask ONE clinical question to start diagnosis in ${category.id}.`;
+                handleSendMessage(intakeTrigger, true);
+            } 
+            else if (hasHistory && !isBaraem) {
+                 const resumeTrigger = language === 'ar'
+                    ? `[SYSTEM_TRIGGER]: المستخدم عاد للجلسة. رحب به باسمه، ذكره بملخص سريع جداً لما وصلنا إليه في الجلسة السابقة، ثم اقترح الخطوة التالية في العلاج.`
+                    : `[SYSTEM_TRIGGER]: User returned. Welcome back, summarize last point briefly, and propose next therapy step.`;
+                 handleSendMessage(resumeTrigger, true);
+            }
+
+        } catch (error) {
+            console.error("Chat initialization failed", error);
+        }
+    };
+    initGemini();
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = false;
+        recognitionRef.current.lang = language === 'ar' ? 'ar-EG' : 'en-US';
+        
+        recognitionRef.current.onstart = () => {
+            setIsListening(true);
+            resetSilenceTimer();
+        };
+
+        recognitionRef.current.onresult = (event: any) => {
+            const transcript = event.results[0][0].transcript;
+            setIsListening(false);
+            if (isCallModeRef.current) handleSendMessage(transcript);
+            else setInputText(prev => prev + ' ' + transcript);
+        };
+        
+        recognitionRef.current.onerror = () => setIsListening(false);
+        recognitionRef.current.onend = () => setIsListening(false);
+    }
+  }, [category.id, language, user, t, handleSendMessage, resetSilenceTimer]);
 
   const handleCopy = (text: string, id: string) => {
       navigator.clipboard.writeText(text);
@@ -285,7 +462,8 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack }) =>
   const handleBookmark = (msg: Message) => {
       const updated = messages.map(m => m.id === msg.id ? { ...m, isBookmarked: !m.isBookmarked } : m);
       setMessages(updated);
-      saveMessages(updated);
+      const chatKey = `sakinnah_chat_${category.id}_${language}`;
+      localStorage.setItem(chatKey, JSON.stringify(updated));
       const key = `sakinnah_bookmarks`;
       let bookmarks = JSON.parse(localStorage.getItem(key) || '[]');
       if (msg.isBookmarked) bookmarks = bookmarks.filter((b: any) => b.id !== msg.id);
@@ -293,23 +471,70 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack }) =>
       localStorage.setItem(key, JSON.stringify(bookmarks));
   };
 
+  const handleInputChange = (text: string) => {
+      setInputText(text);
+      resetSilenceTimer();
+  };
+
   return (
     <div className="h-full flex flex-col bg-slate-50 relative">
-      <header className="px-4 py-3 bg-white shadow-sm flex items-center justify-between z-10">
+      <header className="px-4 py-3 bg-white shadow-sm flex items-center justify-between z-10 sticky top-0">
           <div className="flex items-center gap-3">
               <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                   {isRTL ? <ArrowRight size={24} /> : <ArrowLeft size={24} />}
               </button>
               <div>
                   <h1 className="font-bold text-gray-800 text-lg leading-tight">{t[`cat_${category.id}_title`] || category.id}</h1>
-                  <p className="text-xs text-primary-600 font-medium flex items-center gap-1">
-                      <span className={`w-2 h-2 rounded-full ${isStreaming ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></span>
-                      {isStreaming ? t.typing : t.online}
-                  </p>
+                  {category.id === 'relationships' && user.partner && (
+                      <div className="flex items-center gap-1 text-[10px] text-rose-500 font-bold bg-rose-50 px-2 py-0.5 rounded-full w-fit mt-0.5">
+                          <LinkIcon size={10} />
+                          {language === 'ar' ? `مرتبط مع ${user.partner}` : `Linked with ${user.partner}`}
+                      </div>
+                  )}
+                  {sessionActive && (
+                      <p className="text-xs text-primary-600 font-medium flex items-center gap-1 mt-0.5">
+                          <span className={`w-2 h-2 rounded-full ${isStreaming ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></span>
+                          {isStreaming ? t.typing : t.online}
+                      </p>
+                  )}
               </div>
           </div>
-          <div className="flex gap-2">
-              <button onClick={() => { isCallModeRef.current = true; speakText(t.hereForYou); }} className="p-2 text-primary-600 bg-primary-50 rounded-full hover:bg-primary-100 transition-colors"><Phone size={20} /></button>
+
+          <div className={`hidden md:flex flex-col items-center justify-center px-4 py-1.5 rounded-full border ${getTimerColor()} transition-all shadow-sm relative overflow-hidden group`}>
+                <div className="absolute inset-0 opacity-10 bg-current transition-all" style={{ width: `${getProgressWidth()}%` }}></div>
+                <div className="flex items-center gap-1.5 relative z-10">
+                    <Clock size={14} className={sessionTimeLeft < 300 && sessionTimeLeft > 0 ? "animate-spin" : ""} style={{animationDuration: '3s'}} />
+                    <span className="text-xs font-bold font-mono tracking-wider">{formatTime(sessionTimeLeft)}</span>
+                </div>
+          </div>
+
+          <div className="flex gap-2 items-center">
+              <div className={`md:hidden flex items-center justify-center w-10 h-10 rounded-full border border-gray-100 bg-white shadow-sm relative ${sessionTimeLeft < 300 ? 'text-red-500' : 'text-primary-600'}`}>
+                   <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#eee" strokeWidth="3" />
+                        <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" strokeDasharray={`${getProgressWidth()}, 100`} />
+                   </svg>
+                   <span className="absolute text-[8px] font-bold">{Math.ceil(sessionTimeLeft/60)}</span>
+              </div>
+
+              {isBaraem && (
+                  <div className="flex bg-gray-100 p-1 rounded-lg mr-2">
+                      <button 
+                        onClick={() => setBaraemMode('child')}
+                        className={`p-1.5 rounded-md transition-all flex items-center gap-1 text-xs font-bold ${baraemMode === 'child' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}
+                      >
+                          <Baby size={16} /> {language === 'ar' ? 'الطفل' : 'Child'}
+                      </button>
+                      <button 
+                        onClick={() => setBaraemMode('parent')}
+                        className={`p-1.5 rounded-md transition-all flex items-center gap-1 text-xs font-bold ${baraemMode === 'parent' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400'}`}
+                      >
+                          <UserIcon size={16} /> {language === 'ar' ? 'الولي' : 'Parent'}
+                      </button>
+                  </div>
+              )}
+              
+              <button disabled={!sessionActive} onClick={() => { isCallModeRef.current = true; speakText(t.hereForYou); }} className="p-2 text-primary-600 bg-primary-50 rounded-full hover:bg-primary-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><Phone size={20} /></button>
               <button className="p-2 text-gray-400 hover:text-gray-600"><MoreVertical size={20} /></button>
           </div>
       </header>
@@ -329,32 +554,79 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack }) =>
               />
           ))}
           <div ref={messagesEndRef} />
+          
+          {/* Replaced generic error with gentle closing invitation */}
+          {!sessionActive && (
+              <div className="flex justify-center my-6 animate-fadeIn pb-4">
+                  <div className="bg-teal-50 text-teal-800 px-6 py-4 rounded-2xl shadow-md border border-teal-100 flex flex-col items-center gap-3 max-w-sm text-center">
+                      <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center text-teal-600 mb-1">
+                          <CalendarCheck size={20} />
+                      </div>
+                      <p className="text-sm font-medium leading-relaxed">
+                          {language === 'ar' 
+                            ? 'انتهت جلستنا اليوم على خير. أنا بانتظارك لتكملة الرحلة.' 
+                            : 'Our session has gently concluded. I await you for our next step.'}
+                      </p>
+                      <button onClick={onBack} className="bg-teal-600 text-white px-6 py-2 rounded-xl text-xs font-bold hover:bg-teal-700 transition-colors shadow-sm">
+                          {language === 'ar' ? 'حجز الجلسة القادمة' : 'Book Next Session'}
+                      </button>
+                  </div>
+              </div>
+          )}
       </div>
 
-      {isCallModeRef.current && (
-          <VoiceOverlay 
-             category={category} 
-             language={language} 
-             isSpeaking={isSpeaking} 
-             isListening={isListening} 
-             onClose={() => { isCallModeRef.current = false; synth.cancel(); setIsSpeaking(false); }}
-             onToggleMic={() => {}}
-             onStopSpeaking={() => { synth.cancel(); setIsSpeaking(false); }}
-             isStreaming={isStreaming}
-          />
-      )}
+      {/* Hide input if session ended */}
+      {sessionActive && (
+          <>
+            {isBaraem && baraemMode === 'child' && (
+                <div className="bg-white/80 backdrop-blur-md border-t border-gray-200 p-3 overflow-x-auto">
+                    <div className="flex gap-3">
+                        {PECS_ITEMS.map((item) => (
+                            <button
+                                key={item.id}
+                                onClick={() => {
+                                    if (navigator.vibrate) navigator.vibrate(20);
+                                    handleSendMessage(language === 'ar' ? item.textAr : item.textEn);
+                                }}
+                                className={`flex-shrink-0 flex flex-col items-center justify-center w-20 h-24 rounded-2xl border-2 border-white shadow-sm transition-transform active:scale-95 ${item.color}`}
+                            >
+                                <item.icon size={32} className="mb-2" />
+                                <span className="text-[10px] font-bold text-center leading-tight px-1">{language === 'ar' ? item.textAr : item.textEn}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
 
-      <ChatInput 
-          inputText={inputText}
-          setInputText={setInputText}
-          onSend={handleSendMessage}
-          isListening={isListening}
-          onToggleMic={() => { if (isListening) { recognitionRef.current?.stop(); setIsListening(false); } else { recognitionRef.current?.start(); setIsListening(true); } }}
-          isStreaming={isStreaming}
-          language={language}
-          t={t}
-          isRTL={isRTL}
-      />
+            {isCallModeRef.current && (
+                <VoiceOverlay 
+                   category={category} 
+                   language={language} 
+                   isSpeaking={isSpeaking} 
+                   isListening={isListening} 
+                   onClose={() => { isCallModeRef.current = false; synth.cancel(); setIsSpeaking(false); recognitionRef.current?.stop(); setIsListening(false); }}
+                   onToggleMic={() => { 
+                       if (isListening) { recognitionRef.current?.stop(); setIsListening(false); } 
+                       else { recognitionRef.current?.start(); setIsListening(true); } 
+                   }}
+                   onStopSpeaking={() => { synth.cancel(); setIsSpeaking(false); }}
+                   isStreaming={isStreaming}
+                />
+            )}
+
+            <ChatInput 
+                inputText={inputText}
+                setInputText={handleInputChange}
+                onSend={() => handleSendMessage()}
+                isListening={isListening}
+                onToggleMic={() => { if (isListening) { recognitionRef.current?.stop(); setIsListening(false); } else { recognitionRef.current?.start(); setIsListening(true); } }}
+                isStreaming={isStreaming}
+                language={language}
+                t={t}
+                isRTL={isRTL}
+            />
+          </>
+      )}
     </div>
   );
 };

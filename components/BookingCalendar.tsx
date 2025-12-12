@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, ArrowLeft, Calendar, Clock, Star, CircleCheck, Ticket, MapPin, RefreshCw } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Calendar, Clock, Star, CircleCheck, Ticket, CheckCircle2 } from 'lucide-react';
 import { Language, BookedSession, User } from '../types';
 import { translations } from '../translations';
 
@@ -11,9 +11,10 @@ interface Props {
   user: User;
   minDaysInFuture?: number; // New prop to enforce gap
   rescheduleSession?: BookedSession | null; // New prop for rescheduling
+  onSubscribeRequired: () => void; // Callback to switch view to Subscription
 }
 
-const BookingCalendar: React.FC<Props> = ({ onBack, onConfirm, language, user, minDaysInFuture = 0, rescheduleSession }) => {
+const BookingCalendar: React.FC<Props> = ({ onBack, onConfirm, language, user, minDaysInFuture = 0, rescheduleSession, onSubscribeRequired }) => {
   const t = translations[language] as any;
   const isRTL = language === 'ar';
   const isRescheduleMode = !!rescheduleSession;
@@ -93,16 +94,21 @@ const BookingCalendar: React.FC<Props> = ({ onBack, onConfirm, language, user, m
   };
 
   const handleBook = () => {
+      // --- GATEKEEPER: CHECK SUBSCRIPTION ---
+      if (!user.isSubscribed) {
+          alert(t.subRequiredDesc || "Subscription required to book sessions.");
+          onSubscribeRequired();
+          return;
+      }
+
       if (!selectedTime || !selectedDate) return;
       
-      // If rescheduling, use the OLD ID to replace it, otherwise generate new ID
       const newSession: BookedSession = {
           id: isRescheduleMode ? rescheduleSession!.id : Date.now().toString(),
           date: selectedDate,
           time: selectedTime,
           type: 'human_expert',
-          status: 'upcoming',
-          doctorName: language === 'ar' ? 'المستشارة سكينة' : 'Counselor Sakinnah'
+          status: 'upcoming'
       };
       
       // Request permission and show immediate confirmation if granted
@@ -110,9 +116,10 @@ const BookingCalendar: React.FC<Props> = ({ onBack, onConfirm, language, user, m
           if (Notification.permission === 'granted') {
                const dateStr = selectedDate.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US');
                const title = isRescheduleMode ? t.rescheduleSuccess : t.bookingConfirmedTitle;
+               // UPDATED: Include 40 mins duration in notification
                const body = language === 'ar' 
-                    ? `تم ${isRescheduleMode ? 'تعديل' : 'حجز'} موعدك مع سكينة يوم ${dateStr} الساعة ${selectedTime}` 
-                    : `Your session with Sakinnah is ${isRescheduleMode ? 'rescheduled' : 'confirmed'} for ${dateStr} at ${selectedTime}`;
+                    ? `تم الحجز يوم ${dateStr} الساعة ${selectedTime}. مدة الجلسة: 40 دقيقة.` 
+                    : `Booking confirmed for ${dateStr} at ${selectedTime}. Duration: 40 mins.`;
                
                new Notification(title, {
                    body: body,
@@ -152,16 +159,16 @@ const BookingCalendar: React.FC<Props> = ({ onBack, onConfirm, language, user, m
                   <h2 className="text-2xl font-bold text-gray-800 mb-2">{isRescheduleMode ? t.rescheduleSuccess : t.bookingSuccess}</h2>
                   
                   {/* Digital Ticket */}
-                  <div className="mt-8 bg-white border-2 border-dashed border-gray-300 rounded-2xl p-4 relative">
-                      <div className="absolute -left-3 top-1/2 w-6 h-6 bg-gray-100 rounded-full"></div>
-                      <div className="absolute -right-3 top-1/2 w-6 h-6 bg-gray-100 rounded-full"></div>
+                  <div className="mt-8 bg-white border-2 border-dashed border-gray-300 rounded-2xl p-4 relative text-start">
+                      <div className="absolute -left-3 top-1/2 w-6 h-6 bg-gray-100 rounded-full border-r-2 border-gray-300"></div>
+                      <div className="absolute -right-3 top-1/2 w-6 h-6 bg-gray-100 rounded-full border-l-2 border-gray-300"></div>
                       
-                      <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">{t.sessionTicket}</div>
-                      <div className="text-lg font-bold text-primary-600 mb-1">{selectedDate?.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', {weekday:'long', day:'numeric', month:'short'})}</div>
+                      <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{t.sessionTicket}</div>
+                      <div className="text-lg font-bold text-primary-600">{selectedDate?.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', {weekday:'long', day:'numeric', month:'short'})}</div>
                       <div className="text-2xl font-bold text-gray-900 mb-2">{selectedTime}</div>
-                      <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
-                          <Ticket size={16} />
-                          <span>{t.doctor}</span>
+                      <div className="flex items-center gap-1 text-xs text-gray-500 font-medium bg-gray-50 w-fit px-2 py-1 rounded-md">
+                          <Clock size={12} />
+                          <span>40 {language === 'ar' ? 'دقيقة' : 'mins'}</span>
                       </div>
                   </div>
               </div>
@@ -178,49 +185,33 @@ const BookingCalendar: React.FC<Props> = ({ onBack, onConfirm, language, user, m
             <h1 className="text-lg font-bold text-gray-900">{isRescheduleMode ? t.rescheduleBooking : t.smartBooking}</h1>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 space-y-8 no-scrollbar">
+        <main className="flex-1 overflow-y-auto p-4 space-y-6 no-scrollbar pb-32">
             
-            {/* Reschedule Banner */}
-            {isRescheduleMode && rescheduleSession && (
-                <div className="bg-amber-50/80 backdrop-blur-md border border-amber-200/50 rounded-2xl p-4 flex items-center gap-3 shadow-sm animate-fadeIn">
-                    <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 flex-shrink-0 shadow-sm">
-                        <RefreshCw size={20} />
-                    </div>
-                    <div>
-                        <h3 className="text-xs font-bold text-amber-700 uppercase tracking-wide">{t.rescheduleBooking}</h3>
-                        <p className="text-sm text-gray-800">
-                            {language === 'ar' ? 'الموعد الحالي: ' : 'Current: '}
-                            <span className="font-bold">
-                                {rescheduleSession.date.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', {month:'short', day:'numeric'})} • {rescheduleSession.time}
-                            </span>
-                        </p>
-                    </div>
-                </div>
-            )}
-
             {/* Date Picker */}
             <div>
-                <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 px-1 flex items-center gap-2">
+                <h2 className="text-sm font-bold text-gray-600 mb-3 px-1 flex items-center gap-2">
                     <Calendar size={16} /> {t.pickDate}
                 </h2>
-                {minDaysInFuture > 0 && (
-                     <p className="text-xs text-orange-600 bg-orange-50 px-3 py-2 rounded-lg mb-3 inline-block font-medium">
-                        ⚠️ {language === 'ar' ? `المواعيد متاحة بعد ${minDaysInFuture} أيام لضمان الفعالية.` : `Slots available after ${minDaysInFuture} days for best results.`}
-                     </p>
-                )}
                 <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar px-1 snap-x">
                     {dates.map((date, i) => {
                         const isSelected = selectedDate && date.toDateString() === selectedDate.toDateString();
+                        const isToday = new Date().toDateString() === date.toDateString();
+                        
                         return (
                             <button 
                                 key={i}
                                 onClick={() => { setSelectedDate(date); setSelectedTime(null); }}
-                                className={`flex flex-col items-center justify-center min-w-[70px] h-24 rounded-2xl border transition-all snap-center ${
+                                className={`flex flex-col items-center justify-center min-w-[72px] h-24 rounded-2xl border transition-all snap-center relative ${
                                     isSelected 
                                     ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/30 border-primary-500 scale-105' 
                                     : 'bg-white/60 text-gray-600 border-white/40 hover:bg-white'
                                 }`}
                             >
+                                {isToday && (
+                                    <span className={`absolute -top-2 left-1/2 -translate-x-1/2 text-[9px] font-bold px-2 py-0.5 rounded-full ${isSelected ? 'bg-white text-primary-600' : 'bg-primary-100 text-primary-600'}`}>
+                                        {language === 'ar' ? 'اليوم' : 'Today'}
+                                    </span>
+                                )}
                                 <span className="text-xs font-medium opacity-80">{date.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', {weekday: 'short'})}</span>
                                 <span className="text-2xl font-bold">{date.getDate()}</span>
                             </button>
@@ -231,88 +222,79 @@ const BookingCalendar: React.FC<Props> = ({ onBack, onConfirm, language, user, m
 
             {/* Time Slots */}
             <div className="animate-slideUp">
-                 <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 px-1 flex items-center gap-2">
+                 <h2 className="text-sm font-bold text-gray-600 mb-3 px-1 flex items-center gap-2">
                     <Clock size={16} /> {t.availableSlots}
                 </h2>
                 
-                {/* Morning Grid */}
-                <div className="mb-6">
-                    <div className="flex items-center gap-2 mb-3 px-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
-                        <span className="text-xs font-bold text-gray-400">{t.morning}</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-3">
-                        {morningSlots.map((time, i) => {
-                            const isValid = isTimeSlotValid(time);
-                            return (
-                                <button
-                                    key={i}
-                                    onClick={() => isValid && setSelectedTime(time)}
-                                    disabled={!isValid}
-                                    className={`py-3 rounded-xl text-sm font-bold border transition-all ${
-                                        !isValid ? 'opacity-30 cursor-not-allowed bg-gray-100 border-transparent' :
-                                        selectedTime === time 
-                                        ? 'bg-primary-100 border-primary-300 text-primary-700 shadow-sm' 
-                                        : 'bg-white/40 border-white/40 text-gray-600 hover:bg-white/60'
-                                    }`}
-                                >
-                                    {time}
-                                </button>
-                            );
-                        })}
-                    </div>
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                    {morningSlots.map((time, i) => {
+                        const isValid = isTimeSlotValid(time);
+                        return (
+                            <button
+                                key={i}
+                                onClick={() => isValid && setSelectedTime(time)}
+                                disabled={!isValid}
+                                className={`py-3 rounded-xl text-sm font-bold border transition-all ${
+                                    !isValid ? 'opacity-30 cursor-not-allowed bg-gray-100 border-transparent' :
+                                    selectedTime === time 
+                                    ? 'bg-primary-100 border-primary-300 text-primary-700 shadow-sm' 
+                                    : 'bg-white/40 border-white/40 text-gray-600 hover:bg-white/60'
+                                }`}
+                            >
+                                {time}
+                            </button>
+                        );
+                    })}
                 </div>
 
-                {/* Evening Grid */}
-                <div>
-                    <div className="flex items-center gap-2 mb-3 px-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-400"></div>
-                        <span className="text-xs font-bold text-gray-400">{t.evening}</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        {eveningSlots.map((time, i) => {
-                            const isSmartMatch = time === smartMatchSlot;
-                            const isValid = isTimeSlotValid(time);
-                            return (
-                                <button
-                                    key={i}
-                                    onClick={() => isValid && setSelectedTime(time)}
-                                    disabled={!isValid}
-                                    className={`py-4 rounded-2xl text-sm font-bold border transition-all relative overflow-hidden ${
-                                        !isValid ? 'opacity-30 cursor-not-allowed bg-gray-100 border-transparent' :
-                                        selectedTime === time 
-                                        ? 'bg-indigo-600 text-white border-indigo-500 shadow-lg' 
-                                        : 'bg-white/60 border-white/40 text-gray-700 hover:bg-white/80'
-                                    }`}
-                                >
-                                    {isSmartMatch && !selectedTime && isValid && (
-                                        <div className="absolute top-0 right-0 bg-yellow-400 text-[9px] text-yellow-900 font-bold px-2 py-0.5 rounded-bl-lg flex items-center gap-1 z-10 shadow-sm">
-                                            <Star size={8} fill="currentColor" /> {t.smartMatch}
-                                        </div>
-                                    )}
-                                    {time}
-                                </button>
-                            )
-                        })}
-                    </div>
+                <div className="grid grid-cols-2 gap-3">
+                    {eveningSlots.map((time, i) => {
+                        const isSmartMatch = time === smartMatchSlot;
+                        const isValid = isTimeSlotValid(time);
+                        return (
+                            <button
+                                key={i}
+                                onClick={() => isValid && setSelectedTime(time)}
+                                disabled={!isValid}
+                                className={`py-4 rounded-2xl text-sm font-bold border transition-all relative overflow-hidden ${
+                                    !isValid ? 'opacity-30 cursor-not-allowed bg-gray-100 border-transparent' :
+                                    selectedTime === time 
+                                    ? 'bg-indigo-600 text-white border-indigo-500 shadow-lg' 
+                                    : 'bg-white/60 border-white/40 text-gray-700 hover:bg-white/80'
+                                }`}
+                            >
+                                {isSmartMatch && !selectedTime && isValid && (
+                                    <div className="absolute top-0 right-0 bg-yellow-400 text-[9px] text-yellow-900 font-bold px-2 py-0.5 rounded-bl-lg flex items-center gap-1 z-10 shadow-sm">
+                                        <Star size={8} fill="currentColor" /> {t.smartMatch}
+                                    </div>
+                                )}
+                                {time}
+                            </button>
+                        )
+                    })}
                 </div>
             </div>
 
         </main>
         
-        <div className="p-6 bg-white/40 backdrop-blur-xl border-t border-white/20">
+        {/* Footer Action */}
+        <div className="p-4 bg-white/80 backdrop-blur-xl border-t border-white/50 absolute bottom-0 left-0 right-0 z-20 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
              <button 
                 onClick={handleBook}
                 disabled={!selectedTime}
                 className={`w-full py-4 rounded-2xl font-bold text-lg shadow-lg transition-all flex items-center justify-center gap-2 ${
                     selectedTime 
-                    ? 'bg-gradient-to-r from-teal-500 to-blue-600 text-white hover:scale-[1.02] active:scale-95 shadow-blue-500/20' 
-                    : 'bg-gray-200/50 text-gray-400 cursor-not-allowed'
+                    ? 'bg-gray-900 text-white hover:scale-[1.02] active:scale-95 shadow-gray-900/20' 
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
              >
-                 {isRescheduleMode ? <RefreshCw size={20} /> : null}
+                 {isRescheduleMode ? null : <CheckCircle2 size={20} />}
                  <span>{isRescheduleMode ? t.confirmReschedule : t.confirmBooking}</span>
-                 {selectedTime && !isRescheduleMode && (isRTL ? <ArrowLeft size={20} /> : <ArrowRight size={20} />)}
+                 {selectedTime && (
+                     <span className="text-sm font-normal opacity-70 ml-1">
+                         ({selectedTime})
+                     </span>
+                 )}
              </button>
         </div>
     </div>

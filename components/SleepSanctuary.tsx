@@ -1,16 +1,33 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Language } from '../types';
 import { translations } from '../translations';
-import { GRANDMA_STORY_PROMPT_AR, GRANDMA_STORY_PROMPT_EN, CHILD_STORY_TOPICS_AR, CHILD_STORY_TOPICS_EN, SLEEP_MUSIC_TRACKS } from '../constants';
+import { GRANDMA_STORY_PROMPT_AR, GRANDMA_STORY_PROMPT_EN, STORY_ELEMENTS_AR, STORY_ELEMENTS_EN, SLEEP_MUSIC_TRACKS } from '../constants';
 import { sendMessageStreamToGemini, initializeChat } from '../services/geminiService';
-import { ArrowRight, ArrowLeft, Moon, Stars, Clock, Music, Play, Pause, CircleStop, X, Headphones, User } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Moon, Stars, Clock, Music, Play, Pause, CircleStop, X, Headphones, User, Cloud, Sparkles } from 'lucide-react';
 
 interface Props {
   onBack: () => void;
   language: Language;
 }
+
+const LOADING_MESSAGES_AR = [
+    "جاري نسج خيوط الخيال...",
+    "تيتا سكينة تبحث في كتاب الحكايات...",
+    "نجمع النجوم لنضيء القصة...",
+    "نستحضر الهدوء والسكينة...",
+    "تحضير كوب حليب دافئ للروح...",
+    "القصة تقترب..."
+];
+
+const LOADING_MESSAGES_EN = [
+    "Weaving threads of imagination...",
+    "Grandma is opening the storybook...",
+    "Gathering stars to light the tale...",
+    "Summoning calm and serenity...",
+    "Preparing warm milk for the soul...",
+    "The story is approaching..."
+];
 
 const SleepSanctuary: React.FC<Props> = ({ onBack, language }) => {
   const t = translations[language] as any;
@@ -25,6 +42,9 @@ const SleepSanctuary: React.FC<Props> = ({ onBack, language }) => {
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [storyTitle, setStoryTitle] = useState('');
+  
+  // Waiting Screen State
+  const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
   
   // TTS State
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -45,7 +65,6 @@ const SleepSanctuary: React.FC<Props> = ({ onBack, language }) => {
           window.speechSynthesis.onvoiceschanged = loadVoices;
       }
       
-      // Retry mechanism for Android Chrome
       const interval = setInterval(() => {
           if (window.speechSynthesis.getVoices().length > 0) {
               loadVoices();
@@ -60,6 +79,18 @@ const SleepSanctuary: React.FC<Props> = ({ onBack, language }) => {
       }
   }, []);
 
+  // --- LOADING MESSAGE CYCLER ---
+  useEffect(() => {
+      let interval: ReturnType<typeof setInterval>;
+      if (isGeneratingStory) {
+          const msgs = language === 'ar' ? LOADING_MESSAGES_AR : LOADING_MESSAGES_EN;
+          interval = setInterval(() => {
+              setLoadingMsgIndex(prev => (prev + 1) % msgs.length);
+          }, 3500);
+      }
+      return () => clearInterval(interval);
+  }, [isGeneratingStory, language]);
+
   const calculateSleep = () => {
       const [hours, mins] = wakeTime.split(':').map(Number);
       const wakeDate = new Date();
@@ -73,19 +104,34 @@ const SleepSanctuary: React.FC<Props> = ({ onBack, language }) => {
   };
 
   const handleGrandmaStory = async () => {
-      const topics = language === 'ar' ? CHILD_STORY_TOPICS_AR : CHILD_STORY_TOPICS_EN;
-      const randomTopic = topics[Math.floor(Math.random() * topics.length)];
-      setStoryTitle(randomTopic);
       setIsGeneratingStory(true);
       setStoryText('');
       stopReading();
+      setLoadingMsgIndex(0);
       
+      const elements = language === 'ar' ? STORY_ELEMENTS_AR : STORY_ELEMENTS_EN;
+      const getRandom = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+      
+      const hero = getRandom(elements.heroes);
+      const setting = getRandom(elements.settings);
+      const theme = getRandom(elements.themes);
+      const object = getRandom(elements.objects);
+      
+      setStoryTitle(language === 'ar' ? `حكاية ${hero.split(' ')[0]} و${object.split(' ')[0]}` : `The Tale of ${hero.split(' ')[0]}`);
+
       const promptTemplate = language === 'ar' ? GRANDMA_STORY_PROMPT_AR : GRANDMA_STORY_PROMPT_EN;
-      const prompt = promptTemplate.replace('[Topic]', randomTopic);
-      const userMessage = language === 'ar' ? "احكي لي الحدوته يا تيتا" : "Tell me a story Grandma";
+      const richPrompt = promptTemplate
+          .replace('[HERO]', hero)
+          .replace('[SETTING]', setting)
+          .replace('[THEME]', theme)
+          .replace('[OBJECT]', object);
+
+      const userMessage = language === 'ar' 
+          ? `احكي لي قصة طويلة جداً (20 دقيقة) عن ${hero} في ${setting}.` 
+          : `Tell me a very long story (20 mins) about ${hero} in ${setting}.`;
 
       try {
-          await initializeChat("Grandma Story Session", prompt, undefined, language);
+          await initializeChat("Grandma Story Session", richPrompt, undefined, language);
           const stream = sendMessageStreamToGemini(userMessage, language);
           for await (const chunk of stream) {
               setStoryText(prev => prev + chunk);
@@ -97,20 +143,15 @@ const SleepSanctuary: React.FC<Props> = ({ onBack, language }) => {
       }
   };
 
-  // --- SMART GRANDMA VOICE SELECTOR ---
   const getGrandmaVoice = () => {
       const langPrefix = language === 'ar' ? 'ar' : 'en';
       const langVoices = voices.filter(v => v.lang.startsWith(langPrefix));
       
-      // We want a deep, warm voice.
-      // Priority: Google (often high quality), then others.
       if (language === 'ar') {
-          // Arabic Grandma: Look for 'Google' or 'Laila' (if available on iOS)
           const googleAr = langVoices.find(v => v.name.includes('Google'));
           if (googleAr) return { voice: googleAr, isRobotic: false };
           return { voice: langVoices[0], isRobotic: true };
       } else {
-          // English Grandma: Look for 'Samantha', 'Moira' (iOS), 'Google US English' (Android)
           const preferred = ['Samantha', 'Moira', 'Google US English', 'Zira'];
           for (const name of preferred) {
               const hit = langVoices.find(v => v.name.includes(name));
@@ -123,7 +164,6 @@ const SleepSanctuary: React.FC<Props> = ({ onBack, language }) => {
   const startReading = () => {
       stopReading();
       isCancelledRef.current = false;
-      // Smarter chunking that preserves punctuation pauses
       const chunks = storyText.match(/[^.!?،؟\n]+[.!?،؟\n]*|.+/g) || [storyText];
       speechQueueRef.current = chunks;
       setIsSpeaking(true);
@@ -142,7 +182,6 @@ const SleepSanctuary: React.FC<Props> = ({ onBack, language }) => {
           return;
       }
 
-      // Strip tags like [SOUND: RAIN] before speaking
       const cleanChunk = chunk.replace(/\[.*?\]/g, '');
       if (!cleanChunk.trim()) {
           playNextChunk();
@@ -155,16 +194,12 @@ const SleepSanctuary: React.FC<Props> = ({ onBack, language }) => {
       const { voice, isRobotic } = getGrandmaVoice();
       if (voice) utterance.voice = voice;
 
-      // --- GRANDMA TUNING ---
-      // Goal: Slow, comforting, slightly deeper (older)
       if (isRobotic) {
-          // Compensate for robotic voice
-          utterance.rate = 0.75; // Slower than normal
-          utterance.pitch = 0.8; // Lower to simulate age/warmth
+          utterance.rate = 0.75;
+          utterance.pitch = 0.8; 
       } else {
-          // High quality voice
-          utterance.rate = 0.85; // Relaxed pace
-          utterance.pitch = 0.9; // Slight depth
+          utterance.rate = 0.85; 
+          utterance.pitch = 0.9; 
       }
 
       utterance.onend = () => playNextChunk();
@@ -185,7 +220,7 @@ const SleepSanctuary: React.FC<Props> = ({ onBack, language }) => {
       else if (storyText) startReading();
   };
 
-  // Music Player Logic (unchanged)
+  // Music Player Logic
   useEffect(() => {
       let interval: ReturnType<typeof setInterval>;
       if (isPlaying && currentTrack) {
@@ -199,8 +234,70 @@ const SleepSanctuary: React.FC<Props> = ({ onBack, language }) => {
       return () => clearInterval(interval);
   }, [isPlaying, currentTrack]);
 
+  // --- RENDER WAITING SCREEN ---
+  const renderWaitingScreen = () => {
+      const msgs = language === 'ar' ? LOADING_MESSAGES_AR : LOADING_MESSAGES_EN;
+      
+      return (
+          <div className="absolute inset-0 z-50 bg-[#0B0F19] flex flex-col items-center justify-center overflow-hidden">
+              {/* Animated Background */}
+              <div className="absolute inset-0 bg-gradient-to-b from-[#1a1f35] to-[#0B0F19]"></div>
+              
+              {/* Moon */}
+              <div className="relative mb-12">
+                  <div className="w-40 h-40 bg-indigo-100 rounded-full shadow-[0_0_100px_rgba(199,210,254,0.3)] animate-pulse flex items-center justify-center relative z-10">
+                      <div className="absolute top-6 right-8 w-6 h-6 bg-indigo-200/50 rounded-full blur-sm"></div>
+                      <div className="absolute bottom-10 left-10 w-10 h-10 bg-indigo-200/40 rounded-full blur-sm"></div>
+                  </div>
+                  {/* Orbiting Elements */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 border border-indigo-500/20 rounded-full animate-[spin_10s_linear_infinite]">
+                      <div className="absolute top-0 left-1/2 w-3 h-3 bg-white rounded-full shadow-[0_0_10px_white]"></div>
+                  </div>
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 border border-purple-500/10 rounded-full animate-[spin_15s_linear_infinite_reverse]">
+                      <div className="absolute bottom-0 right-1/2 w-2 h-2 bg-purple-300 rounded-full"></div>
+                  </div>
+              </div>
+
+              {/* Drifting Clouds */}
+              <div className="absolute top-1/4 left-[-100px] text-white/10 animate-[slideRight_20s_linear_infinite]">
+                  <Cloud size={120} fill="currentColor" />
+              </div>
+              <div className="absolute bottom-1/3 right-[-100px] text-white/5 animate-[slideLeft_25s_linear_infinite]">
+                  <Cloud size={160} fill="currentColor" />
+              </div>
+
+              {/* Twinkling Stars */}
+              {[...Array(10)].map((_, i) => (
+                  <div 
+                    key={i} 
+                    className="absolute text-yellow-100 animate-pulse"
+                    style={{
+                        top: `${Math.random() * 100}%`,
+                        left: `${Math.random() * 100}%`,
+                        animationDuration: `${Math.random() * 3 + 1}s`,
+                        opacity: Math.random() * 0.7
+                    }}
+                  >
+                      <Sparkles size={Math.random() * 10 + 5} />
+                  </div>
+              ))}
+
+              {/* Text Rotator */}
+              <div className="relative z-20 text-center px-6 h-16">
+                  <p key={loadingMsgIndex} className="text-indigo-200 text-lg font-medium animate-fadeIn leading-relaxed tracking-wide font-serif">
+                      {msgs[loadingMsgIndex]}
+                  </p>
+              </div>
+          </div>
+      );
+  };
+
   return (
     <div className="h-full bg-slate-950 flex flex-col pt-safe pb-safe animate-fadeIn text-white overflow-hidden relative">
+      
+      {/* Waiting Screen Overlay */}
+      {isGeneratingStory && renderWaitingScreen()}
+
       <div className="absolute inset-0 bg-gradient-to-b from-indigo-950 via-slate-900 to-black z-0"></div>
       <div className="absolute top-0 left-0 w-full h-full opacity-30 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] pointer-events-none z-0"></div>
       
@@ -279,7 +376,7 @@ const SleepSanctuary: React.FC<Props> = ({ onBack, language }) => {
                        <div className="flex-1 flex flex-col min-h-0">
                            <h3 className="text-center text-purple-300 font-bold mb-4 flex items-center justify-center gap-2"><Stars size={16} /> {storyTitle || t.listeningStory}</h3>
                            <div className="flex-1 bg-white/5 backdrop-blur-md rounded-3xl p-8 border border-white/10 overflow-y-auto leading-loose text-lg text-indigo-100 shadow-inner relative mb-4">
-                               {isGeneratingStory && !storyText && <div className="absolute inset-0 flex items-center justify-center flex-col gap-4 text-purple-300"><div className="w-16 h-16 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div><span className="text-sm animate-pulse">{t.listeningStory}</span></div>}
+                               {isGeneratingStory && !storyText && <div className="absolute inset-0 flex items-center justify-center flex-col gap-4 text-purple-300"></div>}
                                <p className="whitespace-pre-wrap font-serif opacity-90">{storyText}</p>
                            </div>
                            <div className="flex gap-3">

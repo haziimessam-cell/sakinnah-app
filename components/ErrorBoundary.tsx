@@ -1,4 +1,3 @@
-
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { translations } from '../translations';
 import { RefreshCcw, AlertTriangle } from 'lucide-react';
@@ -11,7 +10,7 @@ interface State {
   hasError: boolean;
 }
 
-class ErrorBoundary extends Component<Props, State> {
+class ErrorBoundary extends React.Component<Props, State> {
   public state: State = {
     hasError: false
   };
@@ -28,7 +27,8 @@ class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       // Default to Arabic/English fallback based on common sense since we can't easily access context here without hooks
       // But we can check localStorage for language preference
-      const lang = localStorage.getItem('sakinnah_lang') === 'en' ? 'en' : 'ar';
+      const savedLang = localStorage.getItem('sakinnah_lang');
+      const lang: 'ar' | 'en' = (savedLang === 'en' || savedLang === 'ar') ? savedLang : 'ar';
       const t = translations[lang];
 
       return (

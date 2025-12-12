@@ -20,14 +20,15 @@ import GroundingCanvas from './components/GroundingCanvas';
 import DisclaimerModal from './components/DisclaimerModal';
 import SubscriptionScreen from './components/SubscriptionScreen';
 import AssessmentWizard from './components/AssessmentWizard';
+import TherapyPlanResult from './components/TherapyPlanResult'; // Import new component
 import { translations } from './translations';
 import * as Icons from 'lucide-react';
 import { Bell, Menu, X, Home, User as UserIcon, Calendar as CalendarIcon, MessageCircle, CircleCheck, Zap } from 'lucide-react';
 import ErrorBoundary from './components/ErrorBoundary';
-import { DAILY_CHALLENGES } from './constants';
+import { DAILY_CHALLENGES, ASSESSMENT_QUESTIONS } from './constants'; // Import standard questions
 
 const CATEGORIES: Category[] = [
-    { id: 'general', icon: 'MessageCircle', color: 'from-blue-500 to-indigo-600' },
+    { id: 'fadfada', icon: 'MessageCircle', color: 'from-orange-400 to-red-500' }, // Added Fadfada here
     { id: 'anxiety', icon: 'Wind', color: 'from-teal-400 to-emerald-600' },
     { id: 'depression', icon: 'Sun', color: 'from-yellow-400 to-orange-500' },
     { id: 'relationships', icon: 'HeartHandshake', color: 'from-rose-400 to-pink-600', isSpecialized: true },
@@ -49,7 +50,8 @@ const ICON_MAP: Record<string, any> = {
     'Ban': Icons.Ban,
     'Phone': Icons.Phone,
     'CircleHelp': Icons.CircleHelp,
-    'Zap': Icons.Zap
+    'Zap': Icons.Zap,
+    'MessageCircle': Icons.MessageCircle // Added mapping
 };
 
 const App: React.FC = () => {
@@ -61,6 +63,10 @@ const App: React.FC = () => {
   const [infoCategory, setInfoCategory] = useState<Category | null>(null);
   const [lastMood, setLastMood] = useState<string | null>(null);
   
+  // Assessment State
+  const [currentQuestionStep, setCurrentQuestionStep] = useState(0);
+  const [assessmentAnswers, setAssessmentAnswers] = useState<string[]>([]);
+
   // Daily Challenge State
   const [dailyChallenge, setDailyChallenge] = useState<DailyChallenge | null>(null);
   const [challengeCompleted, setChallengeCompleted] = useState(false);
@@ -89,11 +95,6 @@ const App: React.FC = () => {
     const savedLang = localStorage.getItem('sakinnah_lang') as Language;
     if (savedLang) setLanguage(savedLang);
     
-    // Check first launch for disclaimer
-    if (!localStorage.getItem('sakinnah_disclaimer')) {
-        setShowDisclaimer(true);
-    }
-
     // Initialize Daily Challenge
     const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 1000 / 60 / 60 / 24);
     const challengeIndex = dayOfYear % DAILY_CHALLENGES.length;
@@ -109,6 +110,14 @@ const App: React.FC = () => {
         }
     }
   }, []);
+
+  // --- DISCLAIMER LOGIC ---
+  // Trigger ONLY when user is logged in (View is HOME) and hasn't accepted yet
+  useEffect(() => {
+      if (view === 'HOME' && !localStorage.getItem('sakinnah_disclaimer')) {
+          setShowDisclaimer(true);
+      }
+  }, [view]);
 
   // --- TRIAL GATEKEEPER LOGIC ---
   const checkTrialStatus = (currentUser: User) => {
@@ -171,8 +180,29 @@ const App: React.FC = () => {
   };
 
   const handleCategorySelect = (cat: Category) => {
-      setSelectedCategory(cat);
-      setView('CHAT');
+      if (cat.id === 'fadfada') {
+          // FADFADA IS OPEN SPACE -> DIRECT ACCESS
+          setFadfadaInitialMode(undefined);
+          setView('FADFADA');
+      } else {
+          // OTHER CATEGORIES -> 10 QUESTIONS FIRST
+          setSelectedCategory(cat);
+          setAssessmentAnswers([]);
+          setCurrentQuestionStep(0);
+          setView('ASSESSMENT');
+      }
+  };
+
+  const handleAssessmentAnswer = (answer: string) => {
+      const newAnswers = [...assessmentAnswers, answer];
+      setAssessmentAnswers(newAnswers);
+      
+      if (currentQuestionStep < ASSESSMENT_QUESTIONS.length - 1) {
+          setCurrentQuestionStep(prev => prev + 1);
+      } else {
+          // Finished Assessment -> Show Plan
+          setView('PLAN');
+      }
   };
 
   const handleCompleteChallenge = () => {
@@ -251,13 +281,8 @@ const App: React.FC = () => {
                           </div>
                       </header>
                       
-                      <div className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar pb-24">
-                          {/* Daily Mood */}
-                          <div className="bg-white/60 backdrop-blur-xl p-6 rounded-[2rem] border border-white/50 shadow-sm">
-                              <h2 className="text-lg font-bold text-gray-800 mb-4">{t.moodTitle}</h2>
-                              <MoodTracker onSelect={(m) => setLastMood(m)} language={language} />
-                          </div>
-
+                      <div className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar pb-32">
+                          
                           {/* Daily Challenge Widget - SAFE RENDER */}
                           {dailyChallenge && (
                               <div className={`p-5 rounded-[2rem] shadow-sm border border-white/50 relative overflow-hidden transition-all ${challengeCompleted ? 'bg-green-50 border-green-200' : 'bg-white/60 backdrop-blur-xl'}`}>
@@ -293,23 +318,6 @@ const App: React.FC = () => {
 
                           {/* Quick Actions & Featured */}
                           <div>
-                              <button 
-                                  onClick={() => { setFadfadaInitialMode('voice'); setView('FADFADA'); }}
-                                  className="w-full bg-gradient-to-r from-orange-400 to-red-500 p-5 rounded-[2rem] text-white shadow-lg shadow-orange-500/30 text-start group transition-transform active:scale-95 flex items-center gap-4 mb-4 relative overflow-hidden"
-                              >
-                                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
-                                  <div className="bg-white/20 w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-md flex-shrink-0 border border-white/30">
-                                      <Icons.Mic size={24} className="text-white" />
-                                  </div>
-                                  <div>
-                                      <h3 className="font-bold text-lg leading-tight mb-1">{t.voiceVent}</h3>
-                                      <p className="text-[10px] opacity-90">{t.voiceVentDesc}</p>
-                                  </div>
-                                  <div className="ml-auto bg-white/20 p-2 rounded-full backdrop-blur-sm">
-                                      {isRTL ? <Icons.ArrowLeft size={20} /> : <Icons.ArrowRight size={20} />}
-                                  </div>
-                              </button>
-
                               <div className="grid grid-cols-2 gap-4">
                                   <button onClick={() => setView('GARDEN')} className="bg-gradient-to-br from-teal-400 to-emerald-600 p-5 rounded-[2rem] text-white shadow-lg shadow-teal-500/30 text-start group transition-transform active:scale-95">
                                       <div className="mb-3 bg-white/20 w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-md">
@@ -345,11 +353,8 @@ const App: React.FC = () => {
                               </div>
                           </div>
 
-                          {/* Utility Bar */}
+                          {/* Utility Bar - Removed Fadfada button, kept other tools */}
                           <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar">
-                              <button onClick={() => { setFadfadaInitialMode(undefined); setView('FADFADA'); }} className="flex-shrink-0 px-6 py-3 bg-orange-100 text-orange-600 rounded-xl font-bold text-sm whitespace-nowrap">
-                                  {t.fadfadaTitle}
-                              </button>
                               <button onClick={() => setView('SLEEP_TOOL')} className="flex-shrink-0 px-6 py-3 bg-indigo-100 text-indigo-600 rounded-xl font-bold text-sm whitespace-nowrap">
                                   {t.sleepSanctuary}
                               </button>
@@ -359,11 +364,11 @@ const App: React.FC = () => {
                           </div>
                       </div>
 
-                      {/* Bottom Nav */}
-                      <nav className="absolute bottom-6 left-6 right-6 bg-white/80 backdrop-blur-xl rounded-full p-2 shadow-2xl border border-white/50 flex justify-between items-center px-6">
+                      {/* Bottom Nav - Floating Fixed Design */}
+                      <nav className="fixed bottom-6 left-4 right-4 max-w-md mx-auto z-50 bg-white/80 backdrop-blur-xl rounded-full p-2 shadow-2xl border border-white/50 flex justify-between items-center px-6 transition-all duration-300">
                           <button onClick={() => setView('HOME')} className="p-3 text-primary-600 bg-primary-50 rounded-full"><Home size={24} /></button>
                           <button onClick={() => setView('BOOKING')} className="p-3 text-gray-400 hover:text-primary-600"><CalendarIcon size={24} /></button>
-                          <div className="w-12 h-12 bg-gradient-to-r from-primary-600 to-primary-400 rounded-full flex items-center justify-center text-white -mt-8 border-4 border-white shadow-lg cursor-pointer" onClick={() => setView('BREATHING')}>
+                          <div className="w-12 h-12 bg-gradient-to-r from-primary-600 to-primary-400 rounded-full flex items-center justify-center text-white -mt-8 border-4 border-white shadow-lg cursor-pointer transform hover:scale-110 transition-transform" onClick={() => setView('BREATHING')}>
                               <span className="text-2xl">🧘</span>
                           </div>
                           <button onClick={() => setView('JOURNAL')} className="p-3 text-gray-400 hover:text-primary-600"><MessageCircle size={24} /></button>
@@ -371,6 +376,25 @@ const App: React.FC = () => {
                       </nav>
                   </div>
               );
+          case 'ASSESSMENT':
+              return (
+                  <AssessmentWizard 
+                      questions={ASSESSMENT_QUESTIONS} 
+                      currentStep={currentQuestionStep} 
+                      onAnswer={(ans) => handleAssessmentAnswer(ans)} 
+                      onBack={() => setView('HOME')} 
+                      language={language}
+                  />
+              );
+          case 'PLAN':
+              return selectedCategory ? (
+                  <TherapyPlanResult 
+                      category={selectedCategory} 
+                      language={language} 
+                      answers={assessmentAnswers}
+                      onBookSession={() => setView('BOOKING')}
+                  />
+              ) : null;
           case 'CHAT':
               return selectedCategory ? (
                   <ChatInterface 
@@ -391,7 +415,7 @@ const App: React.FC = () => {
           case 'GARDEN':
               return <SoulGarden onBack={() => setView('HOME')} language={language} />;
           case 'DREAM':
-              return <DreamAnalyzer onBack={() => setView('HOME')} language={language} />;
+              return <DreamAnalyzer onBack={() => setView('HOME')} language={language} user={user!} />;
           case 'SLEEP_TOOL':
               return <SleepSanctuary onBack={() => setView('HOME')} language={language} />;
           case 'FADFADA':
@@ -399,7 +423,15 @@ const App: React.FC = () => {
           case 'JOURNAL':
               return <JournalPage onBack={() => setView('HOME')} language={language} user={user!} />;
           case 'BOOKING':
-              return <BookingCalendar onBack={() => setView('HOME')} onConfirm={(s) => { alert('Booked!'); setView('HOME'); }} language={language} user={user!} />;
+              return (
+                  <BookingCalendar 
+                      onBack={() => setView('HOME')} 
+                      onConfirm={(s) => { alert('Booked!'); setView('HOME'); }} 
+                      language={language} 
+                      user={user!}
+                      onSubscribeRequired={() => setView('SUBSCRIPTION')} 
+                  />
+              );
           case 'SUBSCRIPTION':
               return <SubscriptionScreen language={language} onSubscribe={() => { handleUpdateUser({...user!, isSubscribed: true}); setView('HOME'); }} />;
           case 'GROUNDING':

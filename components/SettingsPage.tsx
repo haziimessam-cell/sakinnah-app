@@ -327,7 +327,7 @@ const SettingsPage: React.FC<Props> = ({ user, onBack, onLogout, language, setLa
               {t.logout}
           </button>
           
-          <div className="text-center text-xs text-gray-400 mt-4 font-mono">v3.1.0 (Secure Edition)</div>
+          <div className="text-center text-xs text-gray-400 mt-4 font-mono">v3.1.0 ({t.secureEdition})</div>
       </main>
     </div>
   );

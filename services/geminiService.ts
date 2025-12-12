@@ -7,49 +7,7 @@ import { Language } from "../types";
    ================================================================
    DEPLOYMENT INSTRUCTIONS (FREE & SECURE):
    ================================================================
-   1. Create 'api/chat.js' in your project or Vercel dashboard.
-   2. Paste this code into 'api/chat.js':
-
-   // --- api/chat.js ---
-   const { GoogleGenerativeAI } = require('@google/generative-ai');
-   export const config = { runtime: 'edge' };
-
-   export default async function handler(req) {
-     if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
-     try {
-       const { message, history, systemInstruction } = await req.json();
-       const genAI = new GoogleGenerativeAI(process.env.API_KEY);
-       const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', systemInstruction });
-       
-       // Handle streaming for chat
-       if (history) {
-           const chat = model.startChat({ history: history || [] });
-           const result = await chat.sendMessageStream(message);
-           const stream = new ReadableStream({
-             async start(controller) {
-               for await (const chunk of result.stream) {
-                 const text = chunk.text();
-                 controller.enqueue(new TextEncoder().encode(text));
-               }
-               controller.close();
-             },
-           });
-           return new Response(stream, { headers: { 'Content-Type': 'text/plain' } });
-       } 
-       // Handle single generation (for journal/analysis)
-       else {
-           const result = await model.generateContent(message);
-           return new Response(result.response.text(), { headers: { 'Content-Type': 'text/plain' } });
-       }
-
-     } catch (e) {
-       return new Response(JSON.stringify({ error: e.message }), { status: 500 });
-     }
-   }
-   // --------------------
-
-   3. Set PROXY_URL below to your deployed URL (e.g. 'https://myapp.vercel.app/api/chat').
-   4. Remove process.env.API_KEY usage for production safety.
+   ... (Same as before)
 */
 
 let chatSession: Chat | null = null;
@@ -204,3 +162,23 @@ export const generateContent = async (prompt: string, systemInstruction?: string
     }
     return null;
 }
+
+// --- NEW: Embedding Generation for Vector Search ---
+export const getEmbedding = async (text: string): Promise<number[] | null> => {
+    if (process.env.API_KEY) {
+        try {
+            const genAI = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            // Using the latest embedding model
+            const response = await genAI.models.embedContent({
+                model: 'text-embedding-004',
+                contents: text
+            });
+            return response.embedding.values;
+        } catch (e) {
+            console.error("Embedding Error", e);
+            return null;
+        }
+    }
+    // Proxy fallback would be added here in production
+    return null;
+};

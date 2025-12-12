@@ -68,7 +68,7 @@ export const translations = {
     // New Revolutionary Features
     soulGarden: "حديقة الروح",
     soulGardenDesc: "شاهد حالتك النفسية تنمو وتزهر.",
-    dreamAnalysis: "المختبر النفسي للأحلام",
+    dreamAnalysis: "تفسير الأحلام",
     dreamAnalysisDesc: "تحليل سيكولوجي عميق (Jungian Analysis) لرموز العقل الباطن.",
     grounding: "ملاذ الطمأنينة",
     groundingDesc: "تفاعل فيزيائي لتهدئة نوبات الهلع فوراً.",
@@ -99,6 +99,7 @@ export const translations = {
     stopRecording: "إنهاء الفضفضة",
     analyzingVent: "جاري استيعاب المشاعر...",
     fadfadaPlaceholder: "خرج كل اللي جواك.. مفيش قيود هنا.",
+    sakinnahNote: "ملاحظة سكينة",
     
     // Hug & Art
     virtualHug: "عناق افتراضي",
@@ -212,6 +213,10 @@ export const translations = {
     noSessions: "لا توجد جلسات سابقة",
     noBookmarks: "لم تحفظ أي رسائل بعد",
     enterPartnerUser: "أدخل اسم مستخدم الشريك (مثال: @sara_123)",
+    reportsTab: "التقارير",
+    improvements: "التحسن الملحوظ",
+    clinicalRecs: "توصيات علاجية",
+    noReports: "لا توجد تقارير طبية بعد",
     
     // Journal Page
     myJournal: "مذكراتي",
@@ -275,6 +280,7 @@ export const translations = {
     confirmRestore: "استعادة النسخة الاحتياطية سيستبدل البيانات الحالية. هل أنت متأكد؟",
     restoreSuccess: "تمت الاستعادة بنجاح! سيتم إعادة تحميل التطبيق.",
     invalidFile: "فشل الملف. تأكد من أنه ملف سكينة صالح.",
+    secureEdition: "نسخة آمنة",
 
     // PIN Lock
     enterPin: "أدخل رمز المرور",
@@ -305,7 +311,7 @@ export const translations = {
     recommendedSessions: "عدد الجلسات الموصى بها",
     sessionsPerWeek: "جلسات أسبوعياً",
     intensityLevel: "مستوى الكثافة",
-    bookSession: "حجز جلسة مع سكينة",
+    bookSession: "حجز جلسة مع سكينة مباشرة",
     startAiChat: "البدء مع سكينة الآن",
     bookingToast: "تم إرسال طلب الحجز، سنوافيك بالتفاصيل قريباً.",
     highIntensity: "مكثف",
@@ -326,6 +332,8 @@ export const translations = {
     sessionTicket: "تذكرة الجلسة",
     currentAppt: "الموعد الحالي: ",
     slotsWarning: "المواعيد متاحة بعد {days} أيام لضمان الفعالية.",
+    subRequiredTitle: "الاشتراك مطلوب",
+    subRequiredDesc: "حجز الجلسات متاح فقط للمشتركين. يرجى الاشتراك للمتابعة.",
 
     // Notifications
     reminderTitle: "تذكير بالجلسة",
@@ -367,9 +375,13 @@ export const translations = {
     sessionsCompleted: "جلسات مكتملة",
 
     // Categories
-    cat_baraem_title: "براعم (تنمية المهارات)",
-    cat_baraem_desc: "قسم متخصص لأبطال التوحد وتشتت الانتباه (ADHD) وذويهم.",
-    cat_baraem_science: "يعتمد على تحليل السلوك التطبيقي (ABA) واستراتيجيات التربية الإيجابية.",
+    cat_fadfada_title: "فضفضة (Venting)",
+    cat_fadfada_desc: "مساحة حرة للتعبير عن مشاعرك دون أحكام.",
+    cat_fadfada_science: "يعتمد على التنفيس الانفعالي (Emotional Catharsis) والاستماع النشط.",
+
+    cat_baraem_title: "براعم (أبطال التحدي)",
+    cat_baraem_desc: "قسم متخصص لأبطال التوحد، فرط الحركة (ADHD)، والوسواس القهري (OCD) وذويهم.",
+    cat_baraem_science: "يعتمد على تحليل السلوك التطبيقي (ABA)، التربية الإيجابية، ومنع الاستجابة (ERP) للوسواس.",
     
     cat_relationships_title: "العلاقات",
     cat_relationships_desc: "تحسين التواصل، حل النزاعات، وبناء التفاهم المشترك. يمكنك إضافة شريكك من خلال صفحتك الشخصية لتواصل أفضل وحلول أقرب.",
@@ -407,10 +419,10 @@ export const translations = {
     cat_sleep_desc: "تحسين جودة النوم وعلاج الأرق.",
     cat_sleep_science: "يعتمد على العلاج السلوكي المعرفي للأرق (CBT-I).",
 
-    // Disclaimer
-    disclaimerTitle: "تنويه هام",
-    disclaimerDesc: "سكينة هو واحتك العلمية للاتزان النفسي، مصمم وفق أرقى المعايير العالمية ليكون رفيقك في رحلة الوعي. نحن هنا لتمكينك، مع التأكيد على أن التشخيص الطبي يظل مسؤولية المختصين.",
-    acceptContinue: "أوافق وأريد المتابعة",
+    // Disclaimer - UPDATED
+    disclaimerTitle: "ميثاق سكينة",
+    disclaimerDesc: "سكينة هو منظومة دعم نفسي ذكية، صُممت وفق معايير العلاج المعرفي السلوكي (CBT) لتمنحك أدوات للوعي والاتزان. نحن هنا لنسمعك ونرتب أفكارك علمياً، مع التنويه بأن التشخيص الطبي والعلاج الدوائي يظلان مسؤولية الطبيب المختص. أنت الآن في مساحة آمنة.",
+    acceptContinue: "أوافق على الميثاق",
     
     // Modal
     purposeMethod: "الهدف والمنهجية",
@@ -527,6 +539,7 @@ export const translations = {
     stopRecording: "End Venting",
     analyzingVent: "Understanding emotions...",
     fadfadaPlaceholder: "Let it all out.. no restrictions here.",
+    sakinnahNote: "Sakinnah's Note",
     
     // Hug & Art
     virtualHug: "Virtual Hug",
@@ -640,6 +653,10 @@ export const translations = {
     noSessions: "No session history",
     noBookmarks: "No bookmarked messages",
     enterPartnerUser: "Enter partner username (e.g. @alex_123)",
+    reportsTab: "Reports",
+    improvements: "Observed Improvements",
+    clinicalRecs: "Clinical Recommendations",
+    noReports: "No clinical reports yet",
     
     // Journal Page
     myJournal: "My Journal",
@@ -703,6 +720,7 @@ export const translations = {
     confirmRestore: "Restoring will overwrite current data. Continue?",
     restoreSuccess: "Restore successful! App will reload.",
     invalidFile: "Invalid file format.",
+    secureEdition: "Secure Edition",
 
     // PIN Lock
     enterPin: "Enter Passcode",
@@ -733,7 +751,7 @@ export const translations = {
     recommendedSessions: "Recommended Sessions",
     sessionsPerWeek: "Sessions / Week",
     intensityLevel: "Intensity Level",
-    bookSession: "Book Session with Sakinnah",
+    bookSession: "Book Session with Sakinnah Directly",
     startAiChat: "Start Chat with Sakinnah",
     bookingToast: "Booking request sent. We will contact you shortly.",
     highIntensity: "High",
@@ -754,6 +772,8 @@ export const translations = {
     sessionTicket: "Session Ticket",
     currentAppt: "Current: ",
     slotsWarning: "Slots available after {days} days for best results.",
+    subRequiredTitle: "Subscription Required",
+    subRequiredDesc: "Booking sessions is only available for subscribers. Please subscribe to continue.",
 
     // Notifications
     reminderTitle: "Session Reminder",
@@ -795,9 +815,13 @@ export const translations = {
     sessionsCompleted: "Sessions Completed",
 
     // Categories
+    cat_fadfada_title: "Venting Space (Fadfada)",
+    cat_fadfada_desc: "A free space to express your feelings without judgment.",
+    cat_fadfada_science: "Based on Emotional Catharsis and Active Listening.",
+
     cat_baraem_title: "Baraem (Development)",
-    cat_baraem_desc: "Specialized support for Autism (ASD) & ADHD heroes.",
-    cat_baraem_science: "Based on Applied Behavior Analysis (ABA) and Positive Parenting strategies.",
+    cat_baraem_desc: "Specialized support for Autism (ASD), ADHD, and OCD heroes.",
+    cat_baraem_science: "Based on ABA, Positive Parenting, and Exposure Response Prevention (ERP) for OCD.",
     
     cat_relationships_title: "Relationships",
     cat_relationships_desc: "Improving communication, conflict resolution, and understanding. You can link your partner from your profile for better connection.",
@@ -835,10 +859,10 @@ export const translations = {
     cat_sleep_desc: "Improving sleep quality and treating insomnia.",
     cat_sleep_science: "Based on Cognitive Behavioral Therapy for Insomnia (CBT-I).",
 
-    // Disclaimer
-    disclaimerTitle: "Important Disclaimer",
-    disclaimerDesc: "Sakinnah is your scientific sanctuary for mental balance, designed with world-class standards to accompany your journey of awareness. We empower you, while affirming that medical diagnosis remains the domain of professionals.",
-    acceptContinue: "I Agree & Continue",
+    // Disclaimer - UPDATED
+    disclaimerTitle: "Sakinnah Charter",
+    disclaimerDesc: "Sakinnah is an intelligent psychological support system, designed according to CBT standards to provide you with tools for awareness and balance. We are here to listen and organize your thoughts scientifically, noting that medical diagnosis and medication remain the responsibility of a specialized doctor. You are now in a safe space.",
+    acceptContinue: "I Agree to the Charter",
     
     // Modal
     purposeMethod: "Purpose & Methodology",

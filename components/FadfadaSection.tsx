@@ -1,21 +1,20 @@
 
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Language, User, JournalEntry } from '../types';
 import { translations } from '../translations';
 import { FADFADA_SILENT_PROMPT_AR, FADFADA_SILENT_PROMPT_EN, FADFADA_FLOW_PROMPT_AR, FADFADA_FLOW_PROMPT_EN } from '../constants';
 import { sendMessageStreamToGemini, initializeChat, generateContent } from '../services/geminiService';
 import { syncService } from '../services/syncService';
-import { ArrowRight, ArrowLeft, Mic, MicOff, BookOpen, Send, ShieldCheck, Heart, Volume2, CircleStop, EyeOff, Lock } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Mic, MicOff, BookOpen, Send, ShieldCheck, Heart, Volume2, CircleStop, EyeOff, Lock, HeartHandshake } from 'lucide-react';
 
 interface Props {
   onBack: () => void;
   language: Language;
   user: User;
-  initialMode?: 'silent' | 'voice' | 'flow';
+  initialMode?: 'silent' | 'voice' | 'flow' | 'hug';
 }
 
-type FadfadaMode = 'silent' | 'voice' | 'flow';
+type FadfadaMode = 'silent' | 'voice' | 'flow' | 'hug';
 
 const FadfadaSection: React.FC<Props> = ({ onBack, language, user, initialMode }) => {
   const t = translations[language] as any;
@@ -28,6 +27,7 @@ const FadfadaSection: React.FC<Props> = ({ onBack, language, user, initialMode }
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [isJournalSaved, setIsJournalSaved] = useState(false);
+  const [isHugging, setIsHugging] = useState(false);
   
   const recognitionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -37,6 +37,22 @@ const FadfadaSection: React.FC<Props> = ({ onBack, language, user, initialMode }
       // Scroll to bottom of chat
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory, isStreaming]);
+
+  // Haptic Heartbeat Effect for Hug Mode
+  useEffect(() => {
+      let interval: ReturnType<typeof setInterval>;
+      if (mode === 'hug' && isHugging) {
+          const heartbeat = () => {
+              if (navigator.vibrate) {
+                  // Simulating a heartbeat: lub-dub
+                  navigator.vibrate([60, 100, 60]);
+              }
+          };
+          heartbeat(); // Immediate beat
+          interval = setInterval(heartbeat, 1200); // Repeat every 1.2s (approx 50 BPM - calming)
+      }
+      return () => clearInterval(interval);
+  }, [mode, isHugging]);
 
   // Init Speech Recognition
   useEffect(() => {
@@ -75,10 +91,10 @@ const FadfadaSection: React.FC<Props> = ({ onBack, language, user, initialMode }
       if (selectedMode === 'silent') sysPrompt = language === 'ar' ? FADFADA_SILENT_PROMPT_AR : FADFADA_SILENT_PROMPT_EN;
       if (selectedMode === 'flow') sysPrompt = language === 'ar' ? FADFADA_FLOW_PROMPT_AR : FADFADA_FLOW_PROMPT_EN;
       
-      // For Voice Vent, we don't init chat immediately, we wait for recording to finish
-      if (selectedMode !== 'voice') {
+      // For Voice Vent and Hug, we don't init chat immediately
+      if (selectedMode === 'silent' || selectedMode === 'flow') {
           await initializeChat("Fadfada Session", sysPrompt, undefined, language);
-      } else {
+      } else if (selectedMode === 'voice') {
           // Auto-start recording if entering voice mode
           setTimeout(() => toggleRecording(), 500);
       }
@@ -196,12 +212,12 @@ const FadfadaSection: React.FC<Props> = ({ onBack, language, user, initialMode }
             </button>
             <div className="flex-1">
                 <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                    <Heart size={20} className="text-orange-500 fill-orange-500" /> 
-                    {mode === 'silent' ? t.silentMode : mode === 'voice' ? t.voiceVent : mode === 'flow' ? t.flowChat : t.fadfadaTitle}
+                    {mode === 'hug' ? <HeartHandshake size={20} className="text-pink-500" /> : <Heart size={20} className="text-orange-500 fill-orange-500" />}
+                    {mode === 'silent' ? t.silentMode : mode === 'voice' ? t.voiceVent : mode === 'flow' ? t.flowChat : mode === 'hug' ? t.virtualHug : t.fadfadaTitle}
                 </h1>
                 {mode && <p className="text-xs text-orange-600 font-medium animate-fadeIn flex items-center gap-1"><ShieldCheck size={10} /> {t.safeSpace}</p>}
             </div>
-            {mode && (
+            {mode && mode !== 'hug' && (
                 <button 
                     onClick={saveToJournal}
                     className={`p-2 rounded-full transition-all border border-transparent ${isJournalSaved ? 'bg-green-100 text-green-600 border-green-200' : 'bg-orange-100 text-orange-600 hover:bg-orange-200 hover:border-orange-200'}`}
@@ -250,6 +266,17 @@ const FadfadaSection: React.FC<Props> = ({ onBack, language, user, initialMode }
                         <div className="text-start">
                             <h3 className="font-bold text-gray-800 text-lg group-hover:text-green-600 transition-colors">{t.flowChat}</h3>
                             <p className="text-gray-500 text-xs mt-1">{t.flowChatDesc}</p>
+                        </div>
+                    </button>
+
+                    {/* Hug Mode Button */}
+                    <button onClick={() => startMode('hug')} className="w-full bg-white/80 backdrop-blur-md p-5 rounded-3xl shadow-sm border border-orange-100 hover:shadow-md transition-all flex items-center gap-4 group active:scale-95">
+                        <div className="w-14 h-14 bg-pink-50 rounded-2xl flex items-center justify-center text-pink-500 group-hover:scale-110 transition-transform shadow-sm">
+                            <HeartHandshake size={28} />
+                        </div>
+                        <div className="text-start">
+                            <h3 className="font-bold text-gray-800 text-lg group-hover:text-pink-600 transition-colors">{t.virtualHug}</h3>
+                            <p className="text-gray-500 text-xs mt-1">{t.placeOnHeart}</p>
                         </div>
                     </button>
                 </div>
@@ -325,7 +352,7 @@ const FadfadaSection: React.FC<Props> = ({ onBack, language, user, initialMode }
                                 <div className="mt-6 pt-4 border-t border-gray-50">
                                     <div className="flex items-center gap-2 mb-2">
                                         <Heart size={14} className="text-orange-500 fill-orange-500" />
-                                        <span className="text-xs font-bold text-orange-500 uppercase">Sakinnah's Note</span>
+                                        <span className="text-xs font-bold text-orange-500 uppercase">{t.sakinnahNote}</span>
                                     </div>
                                     <p className="text-gray-800 font-bold text-sm leading-relaxed">{chatHistory[chatHistory.length-1].text}</p>
                                 </div>
@@ -335,10 +362,47 @@ const FadfadaSection: React.FC<Props> = ({ onBack, language, user, initialMode }
                 </div>
             )}
 
+            {/* HUG MODE INTERFACE */}
+            {mode === 'hug' && (
+                <div className="flex flex-col items-center justify-center h-full p-6 text-center space-y-12 animate-fadeIn relative">
+                    <div className="absolute inset-0 bg-pink-100/30 animate-pulse pointer-events-none" style={{animationDuration: '4s'}}></div>
+                    
+                    <div 
+                        className={`w-64 h-64 rounded-full flex items-center justify-center transition-all duration-1000 relative cursor-pointer select-none active:scale-95 ${isHugging ? 'scale-110 shadow-[0_0_80px_rgba(244,114,182,0.6)]' : 'shadow-xl shadow-pink-200 scale-100'}`}
+                        onTouchStart={(e) => { e.preventDefault(); setIsHugging(true); }}
+                        onTouchEnd={() => setIsHugging(false)}
+                        onMouseDown={() => setIsHugging(true)}
+                        onMouseUp={() => setIsHugging(false)}
+                        onMouseLeave={() => setIsHugging(false)}
+                        style={{ background: 'linear-gradient(135deg, #fbcfe8 0%, #f9a8d4 100%)' }}
+                    >
+                        {/* Pulsating Waves when hugging */}
+                        {isHugging && (
+                            <>
+                                <div className="absolute inset-0 border-4 border-pink-300 rounded-full animate-ping opacity-60"></div>
+                                <div className="absolute inset-0 border-4 border-pink-300 rounded-full animate-ping opacity-40" style={{animationDelay: '0.4s'}}></div>
+                                <div className="absolute inset-0 border-4 border-pink-300 rounded-full animate-ping opacity-20" style={{animationDelay: '0.8s'}}></div>
+                            </>
+                        )}
+                        
+                        <div className={`transition-all duration-700 ${isHugging ? 'scale-125' : 'scale-100 animate-breathing'}`}>
+                            <Heart size={100} className="text-white fill-white drop-shadow-lg" />
+                        </div>
+                    </div>
+
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-800 mb-2">{isHugging ? (language === 'ar' ? 'أنا معك...' : 'I am here...') : t.virtualHug}</h2>
+                        <p className="text-gray-500 text-sm max-w-xs mx-auto leading-relaxed">
+                            {isHugging ? (language === 'ar' ? 'تنفس ببطء... استشعر الهدوء.' : 'Breathe slowly... feel the calm.') : t.placeOnHeart}
+                        </p>
+                    </div>
+                </div>
+            )}
+
         </main>
 
-        {/* INPUT CONTROLS */}
-        {mode && (
+        {/* INPUT CONTROLS (Only for Chat modes) */}
+        {mode && mode !== 'hug' && (
             <div className="bg-white/80 backdrop-blur-xl p-4 pb-safe border-t border-white/50 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
                 {mode === 'voice' ? (
                     <button 
