@@ -4,21 +4,30 @@
   "appName": "Sakinnah",
   "webDir": "dist",
   "server": {
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "cleartext": true
   },
   "plugins": {
     "SplashScreen": {
-      "launchShowDuration": 3000,
+      "launchShowDuration": 2000,
       "launchAutoHide": true,
       "backgroundColor": "#F5F7FA",
       "androidSplashResourceName": "splash",
       "androidScaleType": "CENTER_CROP",
       "showSpinner": true,
-      "spinnerColor": "#0ea5e9"
+      "androidSpinnerStyle": "large",
+      "spinnerColor": "#0ea5e9",
+      "splashFullScreen": true,
+      "splashImmersive": true
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#F5F7FA",
+      "overlaysWebView": false
     },
     "Keyboard": {
       "resize": "body",
-      "style": "dark",
+      "style": "DARK",
       "resizeOnFullScreen": true
     }
   }

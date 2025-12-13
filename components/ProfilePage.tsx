@@ -50,7 +50,8 @@ const ProfilePage: React.FC<Props> = ({ user, onBack, language, onUpdateUser, on
   const [editFormData, setEditFormData] = useState({
       name: user.name,
       age: user.age,
-      gender: user.gender
+      gender: user.gender,
+      partner: user.partner || ''
   });
 
   useEffect(() => {
@@ -113,7 +114,8 @@ const ProfilePage: React.FC<Props> = ({ user, onBack, language, onUpdateUser, on
     setEditFormData({
         name: user.name,
         age: user.age,
-        gender: user.gender
+        gender: user.gender,
+        partner: user.partner || ''
     });
 
     return () => {
@@ -122,12 +124,23 @@ const ProfilePage: React.FC<Props> = ({ user, onBack, language, onUpdateUser, on
   }, [language, user]);
 
   const handleSaveProfile = () => {
+      const partnerChanged = editFormData.partner !== user.partner;
+      
       onUpdateUser({
           ...user,
           name: editFormData.name,
           age: editFormData.age,
-          gender: editFormData.gender
+          gender: editFormData.gender,
+          partner: editFormData.partner
       });
+
+      if (partnerChanged && editFormData.partner) {
+          realtimeService.emit('PARTNER_LINKED', { 
+              initiator: user.username,
+              partnerUsername: editFormData.partner
+          });
+      }
+
       setIsEditing(false);
   };
 
@@ -285,13 +298,24 @@ const ProfilePage: React.FC<Props> = ({ user, onBack, language, onUpdateUser, on
                                 value={editFormData.name} 
                                 onChange={(e) => setEditFormData(prev => ({...prev, name: e.target.value}))}
                                 className="w-full bg-white/50 border border-white/50 rounded-lg px-3 py-1.5 text-lg font-bold text-gray-800 focus:ring-2 focus:ring-primary-200 outline-none"
+                                placeholder={t.namePlaceholder}
                               />
-                              <input 
-                                type="number" 
-                                value={editFormData.age} 
-                                onChange={(e) => setEditFormData(prev => ({...prev, age: e.target.value}))}
-                                className="w-20 bg-white/50 border border-white/50 rounded-lg px-3 py-1 text-sm text-gray-600 focus:ring-2 focus:ring-primary-200 outline-none"
-                              />
+                              <div className="flex gap-2">
+                                  <input 
+                                    type="number" 
+                                    value={editFormData.age} 
+                                    onChange={(e) => setEditFormData(prev => ({...prev, age: e.target.value}))}
+                                    className="w-20 bg-white/50 border border-white/50 rounded-lg px-3 py-1 text-sm text-gray-600 focus:ring-2 focus:ring-primary-200 outline-none"
+                                    placeholder={t.agePlaceholder}
+                                  />
+                                  <input 
+                                    type="text" 
+                                    value={editFormData.partner} 
+                                    onChange={(e) => setEditFormData(prev => ({...prev, partner: e.target.value}))}
+                                    className="flex-1 bg-white/50 border border-white/50 rounded-lg px-3 py-1 text-sm text-gray-600 focus:ring-2 focus:ring-primary-200 outline-none placeholder-gray-400"
+                                    placeholder={t.enterPartnerUser}
+                                  />
+                              </div>
                           </div>
                       ) : (
                           <>

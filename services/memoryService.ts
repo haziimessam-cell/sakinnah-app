@@ -35,11 +35,6 @@ export const memoryService = {
      * Uses Gemini to find "Permanent Facts" and saves them with embeddings.
      */
     async extractAndSaveMemory(userText: string, username: string): Promise<void> {
-        if (!userText || !username || typeof userText !== 'string' || typeof username !== 'string') {
-            console.warn('Invalid input to extractAndSaveMemory');
-            return;
-        }
-
         try {
             // 1. Ask Gemini to extract facts
             // We use a cleaner prompt format to ensure JSON validity
@@ -116,15 +111,9 @@ export const memoryService = {
      * Finds relevant memories based on semantic similarity to the user's current input.
      */
     async retrieveRelevantMemories(userText: string, username: string): Promise<string> {
-        if (!userText || !username || typeof userText !== 'string' || typeof username !== 'string') {
-            console.warn('Invalid input to retrieveRelevantMemories');
-            return "";
-        }
-
-        try {
-            const key = `sakinnah_memories_${username}`;
-            const stored = localStorage.getItem(key);
-            if (!stored) return "";
+        const key = `sakinnah_memories_${username}`;
+        const stored = localStorage.getItem(key);
+        if (!stored) return "";
 
         const memories: Memory[] = JSON.parse(stored);
         if (memories.length === 0) return "";
@@ -177,11 +166,7 @@ export const memoryService = {
 
         // Format for System Prompt
         const memoryContext = uniqueMemories.map(m => `- ${m?.content}`).join('\n');
-
+        
         return `\n[RECALLED_MEMORIES_FROM_VECTOR_DB]:\n${memoryContext}\n`;
-        } catch (error) {
-            console.error('Error in retrieveRelevantMemories:', error);
-            return "";
-        }
     }
 };

@@ -1,31 +1,39 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { User, ViewState, Language, Category, BookedSession, DailyChallenge } from './types';
 import LoginPage from './components/LoginPage';
-import ProfilePage from './components/ProfilePage';
-import SettingsPage from './components/SettingsPage';
-import HelpPage from './components/HelpPage';
-import SoulGarden from './components/SoulGarden';
-import DreamAnalyzer from './components/DreamAnalyzer';
-import SleepSanctuary from './components/SleepSanctuary';
-import FadfadaSection from './components/FadfadaSection';
-import JournalPage from './components/JournalPage';
-import BookingCalendar from './components/BookingCalendar';
-import ChatInterface from './components/ChatInterface';
+import LoadingScreen from './components/LoadingScreen';
+import ErrorBoundary from './components/ErrorBoundary';
 import CategoryCard from './components/CategoryCard';
 import CategoryInfoModal from './components/CategoryInfoModal';
-import MoodTracker from './components/MoodTracker';
-import BreathingExercise from './components/BreathingExercise';
-import GroundingCanvas from './components/GroundingCanvas';
 import DisclaimerModal from './components/DisclaimerModal';
 import SubscriptionScreen from './components/SubscriptionScreen';
 import AssessmentWizard from './components/AssessmentWizard';
 import TherapyPlanResult from './components/TherapyPlanResult';
 import { translations } from './translations';
 import * as Icons from 'lucide-react';
-import { Bell, Menu, X, Home, User as UserIcon, Calendar as CalendarIcon, MessageCircle, CircleCheck, Zap, WifiOff } from 'lucide-react';
-import ErrorBoundary from './components/ErrorBoundary';
+import { Menu, Home, User as UserIcon, Calendar as CalendarIcon, MessageCircle, CircleCheck, Zap, WifiOff } from 'lucide-react';
 import { DAILY_CHALLENGES, ASSESSMENT_QUESTIONS } from './constants';
+
+// Android / Capacitor Imports
+import { App as CapApp } from '@capacitor/app';
+import { SplashScreen } from '@capacitor/splash-screen';
+import { StatusBar, Style } from '@capacitor/status-bar';
+
+// Lazy Load Heavy Components
+const ChatInterface = lazy(() => import('./components/ChatInterface'));
+const ProfilePage = lazy(() => import('./components/ProfilePage'));
+const SettingsPage = lazy(() => import('./components/SettingsPage'));
+const HelpPage = lazy(() => import('./components/HelpPage'));
+const SoulGarden = lazy(() => import('./components/SoulGarden'));
+const DreamAnalyzer = lazy(() => import('./components/DreamAnalyzer'));
+const SleepSanctuary = lazy(() => import('./components/SleepSanctuary'));
+const FadfadaSection = lazy(() => import('./components/FadfadaSection'));
+const JournalPage = lazy(() => import('./components/JournalPage'));
+const BookingCalendar = lazy(() => import('./components/BookingCalendar'));
+const BreathingExercise = lazy(() => import('./components/BreathingExercise'));
+const GroundingCanvas = lazy(() => import('./components/GroundingCanvas'));
+const MoodTracker = lazy(() => import('./components/MoodTracker'));
 
 const CATEGORIES: Category[] = [
     { id: 'fadfada', icon: 'MessageCircle', color: 'from-orange-400 to-red-500' },
@@ -86,7 +94,39 @@ const App: React.FC = () => {
   const t = translations[language];
   const isRTL = language === 'ar';
 
-  // --- INITIALIZATION ---
+  // --- ANDROID & APP INITIALIZATION ---
+  useEffect(() => {
+    const initApp = async () => {
+        try {
+            // Hide Splash Screen
+            await SplashScreen.hide();
+            
+            // Set Status Bar
+            await StatusBar.setStyle({ style: Style.Light });
+            await StatusBar.setBackgroundColor({ color: '#F5F7FA' }); // Matches light bg
+
+            // Handle Android Back Button
+            CapApp.addListener('backButton', ({ canGoBack }) => {
+                if (view !== 'HOME' && view !== 'LOGIN') {
+                    setView('HOME');
+                } else if (!canGoBack) {
+                    CapApp.exitApp();
+                } else {
+                    window.history.back();
+                }
+            });
+        } catch (e) {
+            console.log("Web environment - skipping native plugins");
+        }
+    };
+    initApp();
+
+    return () => {
+        CapApp.removeAllListeners();
+    };
+  }, [view]);
+
+  // --- DATA INITIALIZATION ---
   useEffect(() => {
     // 1. User
     const savedUser = localStorage.getItem('sakinnah_user');
@@ -137,9 +177,15 @@ const App: React.FC = () => {
       if (darkMode) {
           document.documentElement.classList.add('dark');
           localStorage.setItem('sakinnah_theme', 'dark');
+          // Update status bar for dark mode if native
+          StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
+          StatusBar.setBackgroundColor({ color: '#0f172a' }).catch(() => {});
       } else {
           document.documentElement.classList.remove('dark');
           localStorage.setItem('sakinnah_theme', 'light');
+          // Update status bar for light mode
+          StatusBar.setStyle({ style: Style.Light }).catch(() => {});
+          StatusBar.setBackgroundColor({ color: '#F5F7FA' }).catch(() => {});
       }
   }, [darkMode]);
 
@@ -395,31 +441,79 @@ const App: React.FC = () => {
           case 'PLAN':
               return selectedCategory ? <TherapyPlanResult category={selectedCategory} language={language} answers={assessmentAnswers} onBookSession={() => setView('BOOKING')} /> : null;
           case 'CHAT':
-              return selectedCategory ? <ChatInterface user={user!} category={selectedCategory} language={language} onBack={() => setView('HOME')} /> : null;
+              return selectedCategory ? (
+                  <Suspense fallback={<LoadingScreen />}>
+                      <ChatInterface user={user!} category={selectedCategory} language={language} onBack={() => setView('HOME')} />
+                  </Suspense>
+              ) : null;
           case 'PROFILE':
-              return <ProfilePage user={user!} onBack={() => setView('HOME')} language={language} onUpdateUser={handleUpdateUser} onViewJournal={() => setView('JOURNAL')} />;
+              return (
+                  <Suspense fallback={<LoadingScreen />}>
+                      <ProfilePage user={user!} onBack={() => setView('HOME')} language={language} onUpdateUser={handleUpdateUser} onViewJournal={() => setView('JOURNAL')} />
+                  </Suspense>
+              );
           case 'SETTINGS':
-              return <SettingsPage user={user!} onBack={() => setView('HOME')} onLogout={handleLogout} language={language} setLanguage={(l) => { setLanguage(l); localStorage.setItem('sakinnah_lang', l); }} />;
+              return (
+                  <Suspense fallback={<LoadingScreen />}>
+                      <SettingsPage user={user!} onBack={() => setView('HOME')} onLogout={handleLogout} language={language} setLanguage={(l) => { setLanguage(l); localStorage.setItem('sakinnah_lang', l); }} />
+                  </Suspense>
+              );
           case 'HELP':
-              return <HelpPage onBack={() => setView('HOME')} language={language} />;
+              return (
+                  <Suspense fallback={<LoadingScreen />}>
+                      <HelpPage onBack={() => setView('HOME')} language={language} />
+                  </Suspense>
+              );
           case 'BREATHING':
-              return <BreathingExercise onClose={() => setView('HOME')} language={language} />;
+              return (
+                  <Suspense fallback={<LoadingScreen />}>
+                      <BreathingExercise onClose={() => setView('HOME')} language={language} />
+                  </Suspense>
+              );
           case 'GARDEN':
-              return <SoulGarden onBack={() => setView('HOME')} language={language} />;
+              return (
+                  <Suspense fallback={<LoadingScreen />}>
+                      <SoulGarden onBack={() => setView('HOME')} language={language} />
+                  </Suspense>
+              );
           case 'DREAM':
-              return <DreamAnalyzer onBack={() => setView('HOME')} language={language} user={user!} />;
+              return (
+                  <Suspense fallback={<LoadingScreen />}>
+                      <DreamAnalyzer onBack={() => setView('HOME')} language={language} user={user!} />
+                  </Suspense>
+              );
           case 'SLEEP_TOOL':
-              return <SleepSanctuary onBack={() => setView('HOME')} language={language} />;
+              return (
+                  <Suspense fallback={<LoadingScreen />}>
+                      <SleepSanctuary onBack={() => setView('HOME')} language={language} />
+                  </Suspense>
+              );
           case 'FADFADA':
-              return <FadfadaSection onBack={() => { setView('HOME'); setFadfadaInitialMode(undefined); }} language={language} user={user!} initialMode={fadfadaInitialMode} />;
+              return (
+                  <Suspense fallback={<LoadingScreen />}>
+                      <FadfadaSection onBack={() => { setView('HOME'); setFadfadaInitialMode(undefined); }} language={language} user={user!} initialMode={fadfadaInitialMode} />
+                  </Suspense>
+              );
           case 'JOURNAL':
-              return <JournalPage onBack={() => setView('HOME')} language={language} user={user!} />;
+              return (
+                  <Suspense fallback={<LoadingScreen />}>
+                      <JournalPage onBack={() => setView('HOME')} language={language} user={user!} />
+                  </Suspense>
+              );
           case 'BOOKING':
-              return <BookingCalendar onBack={() => setView('HOME')} onConfirm={(s) => { alert('Booked!'); setView('HOME'); }} language={language} user={user!} onSubscribeRequired={() => setView('SUBSCRIPTION')} />;
+              return (
+                  <Suspense fallback={<LoadingScreen />}>
+                      <BookingCalendar onBack={() => setView('HOME')} onConfirm={(s) => { alert('Booked!'); setView('HOME'); }} language={language} user={user!} onSubscribeRequired={() => setView('SUBSCRIPTION')} />
+                  </Suspense>
+              );
           case 'SUBSCRIPTION':
               return <SubscriptionScreen language={language} onSubscribe={() => { handleUpdateUser({...user!, isSubscribed: true}); setView('HOME'); }} />;
           case 'GROUNDING':
-              return <GroundingCanvas onClose={() => setView('HOME')} />;
+              return (
+                  <Suspense fallback={<LoadingScreen />}>
+                      <GroundingCanvas onClose={() => setView('HOME')} />
+                  </Suspense>
+              );
           default:
               return null;
       }
@@ -428,7 +522,9 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary>
         <div className={`h-screen w-full bg-sakinnah-bg dark:bg-slate-950 text-gray-900 dark:text-white font-sans overflow-hidden ${isRTL ? 'rtl' : 'ltr'}`} dir={isRTL ? 'rtl' : 'ltr'}>
-            {renderContent()}
+            <Suspense fallback={<LoadingScreen />}>
+                {renderContent()}
+            </Suspense>
             
             {showDisclaimer && (
                 <DisclaimerModal 

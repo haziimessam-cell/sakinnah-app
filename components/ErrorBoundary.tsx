@@ -12,7 +12,7 @@ interface State {
 }
 
 class ErrorBoundary extends Component<Props, State> {
-  public readonly state: State = {
+  public state: State = {
     hasError: false,
     error: null
   };
@@ -21,11 +21,16 @@ class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("Uncaught error:", error, errorInfo);
   }
 
-  public render(): ReactNode {
+  private handleReload = () => {
+    this.setState({ hasError: false, error: null });
+    window.location.reload();
+  };
+
+  public render() {
     if (this.state.hasError) {
       // Safe fallback for language
       const savedLang = localStorage.getItem('sakinnah_lang');
@@ -44,10 +49,7 @@ class ErrorBoundary extends Component<Props, State> {
             <span className="text-xs opacity-70 mt-2 block font-mono">{this.state.error?.message}</span>
           </p>
           <button
-            onClick={() => {
-                this.setState({ hasError: false, error: null });
-                window.location.reload();
-            }}
+            onClick={this.handleReload}
             className="px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold shadow-lg flex items-center gap-2 transition-all active:scale-95"
           >
             <RefreshCcw size={18} />

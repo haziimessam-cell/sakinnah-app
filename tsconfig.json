@@ -24,8 +24,6 @@
       ]
     },
     "allowImportingTsExtensions": true,
-    "noEmit": true,
-    "strict": false,
-    "esModuleInterop": true
+    "noEmit": true
   }
 }

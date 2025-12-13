@@ -1319,131 +1319,40 @@ const KNOWLEDGE_VECTOR_STORE: ClinicalDocument[] = [
   }
 ];
 
-// 3. SEMANTIC SEARCH ENGINE (Optimized with caching)
-const relevanceCache = new Map<string, number>();
-
+// 3. SEMANTIC SEARCH ENGINE (Simulated)
 const calculateRelevance = (query: string, doc: ClinicalDocument, language: Language): number => {
-    // Create cache key
-    const cacheKey = `${query}_${doc.id}_${language}`;
-
-    // Check cache first
-    if (relevanceCache.has(cacheKey)) {
-        return relevanceCache.get(cacheKey)!;
-    }
-
     // Normalize query
     const normalizedQuery = language === 'ar' ? normalizeArabic(query.toLowerCase()) : query.toLowerCase();
-
+    
     // Tokenize query: Split by spaces and punctuation, filter out short words
     const tokens = normalizedQuery.split(/[\s,?.!]+/).filter(t => t.length > 2);
-
-    // Early exit if no valid tokens
-    if (tokens.length === 0) {
-        relevanceCache.set(cacheKey, 0);
-        return 0;
-    }
-
+    
     let score = 0;
-
-    // Tag Matching (highest weight - most specific)
+    
+    // Tag Matching
     doc.tags.forEach(tag => {
         const normalizedTag = language === 'ar' ? normalizeArabic(tag) : tag.toLowerCase();
         if (tokens.some(t => t.includes(normalizedTag) || normalizedTag.includes(t))) score += 5;
     });
 
-    // Content Matching (medium weight)
+    // Content Matching
     const content = language === 'ar' ? doc.contentAr : doc.contentEn;
     const normalizedContent = language === 'ar' ? normalizeArabic(content) : content.toLowerCase();
 
-    // Use Set for faster lookups
-    const contentTokens = new Set(normalizedContent.split(/\s+/));
-    const matchingTokens = tokens.filter(t => contentTokens.has(t) || normalizedContent.includes(t));
-    score += matchingTokens.length * 2;
+    if (tokens.some(t => normalizedContent.includes(t))) score += 2;
 
-    // Category Matching (medium weight)
+    // Category Matching
     const cat = doc.category.toLowerCase();
     if (tokens.includes(cat) || normalizedQuery.includes(cat)) score += 3;
-
-    // Cache the result
-    relevanceCache.set(cacheKey, score);
-
-    // Limit cache size to prevent memory issues
-    if (relevanceCache.size > 1000) {
-        const firstKey = relevanceCache.keys().next().value;
-        relevanceCache.delete(firstKey);
-    }
 
     return score;
 };
 
 export const ragService = {
   /**
-   * Detects crisis situations based on keywords and patterns
-   */
-  detectCrisis: (userInput: string, language: Language): { isCrisis: boolean; severity: 'high' | 'medium' | 'low' | null; category: string | null } => {
-    try {
-      if (!userInput || typeof userInput !== 'string') {
-        console.warn('Invalid input to detectCrisis');
-        return { isCrisis: false, severity: null, category: null };
-      }
-
-      const normalizedInput = language === 'ar' ? normalizeArabic(userInput.toLowerCase()) : userInput.toLowerCase();
-
-    // High severity crisis keywords
-    const highSeverityAr = ['انتحار', 'اموت', 'اقتل نفسي', 'ابي اموت', 'عاوز اموت', 'انهي حياتي', 'اذي نفسي', 'مفيش فايدة'];
-    const highSeverityEn = ['suicide', 'kill myself', 'end my life', 'want to die', 'harm myself', 'no point living'];
-
-    // Medium severity keywords
-    const mediumSeverityAr = ['هلع', 'رعب', 'خوف شديد', 'نوبة', 'هجوم', 'صدمة'];
-    const mediumSeverityEn = ['panic attack', 'severe anxiety', 'trauma', 'flashback', 'breakdown'];
-
-    const keywords = language === 'ar' ? [...highSeverityAr, ...mediumSeverityAr] : [...highSeverityEn, ...mediumSeverityEn];
-    const highKeywords = language === 'ar' ? highSeverityAr : highSeverityEn;
-
-    let isCrisis = false;
-    let severity: 'high' | 'medium' | 'low' | null = null;
-    let category: string | null = null;
-
-    // Check for high severity
-    for (const keyword of highKeywords) {
-      const normalizedKeyword = language === 'ar' ? normalizeArabic(keyword) : keyword;
-      if (normalizedInput.includes(normalizedKeyword)) {
-        isCrisis = true;
-        severity = 'high';
-        category = 'suicide/self-harm';
-        break;
-      }
-    }
-
-    // Check for medium severity if not high
-    if (!isCrisis) {
-      for (const keyword of keywords) {
-        const normalizedKeyword = language === 'ar' ? normalizeArabic(keyword) : keyword;
-        if (normalizedInput.includes(normalizedKeyword)) {
-          isCrisis = true;
-          severity = 'medium';
-          category = 'acute_distress';
-          break;
-        }
-      }
-    }
-
-    return { isCrisis, severity, category };
-    } catch (error) {
-      console.error('Error in detectCrisis:', error);
-      return { isCrisis: false, severity: null, category: null };
-    }
-  },
-
-  /**
    * Retrieves strictly relevant clinical context based on user input.
    */
   retrieveContext: (userInput: string, language: Language): string | null => {
-    try {
-      if (!userInput || typeof userInput !== 'string') {
-        console.warn('Invalid input to retrieveContext');
-        return null;
-      }
     const scores = KNOWLEDGE_VECTOR_STORE.map(doc => ({
         doc,
         score: calculateRelevance(userInput, doc, language)
@@ -1451,14 +1360,14 @@ export const ragService = {
 
     // Lower threshold slightly to ensure general advice is caught if specific tags miss
     const topResults = scores
-        .filter(item => item.score > 2)
+        .filter(item => item.score > 2) 
         .sort((a, b) => b.score - a.score)
         .slice(0, 2); // Take top 2 most relevant protocols
 
     if (topResults.length === 0) return null;
 
-    const contextIntro = language === 'ar'
-      ? "⚠️ [تعليمات للمعالج]: استخدم البروتوكولات العلمية التالية في ردك، لكن اصغها بأسلوبك الإنساني (المصري) ولا تذكر المصدر بشكل أكاديمي جاف:"
+    const contextIntro = language === 'ar' 
+      ? "⚠️ [تعليمات للمعالج]: استخدم البروتوكولات العلمية التالية في ردك، لكن اصغها بأسلوبك الإنساني (المصري) ولا تذكر المصدر بشكل أكاديمي جاف:" 
       : "⚠️ [THERAPIST INSTRUCTIONS]: Use these clinical protocols to guide your advice, but phrase them in your warm human persona (do not sound like a textbook):";
 
     const content = topResults.map(r => {
@@ -1467,41 +1376,5 @@ export const ragService = {
     }).join('\n\n');
 
     return `${contextIntro}\n${content}`;
-    } catch (error) {
-      console.error('Error in retrieveContext:', error);
-      return null;
-    }
-  },
-
-  /**
-   * Get evidence-based technique recommendations for a specific category
-   */
-  getTechniqueRecommendations: (category: string, language: Language): string[] => {
-    try {
-      if (!category || typeof category !== 'string') {
-        console.warn('Invalid category to getTechniqueRecommendations');
-        return [];
-      }
-    const categoryDocs = KNOWLEDGE_VECTOR_STORE.filter(doc => doc.category === category);
-
-    if (categoryDocs.length === 0) return [];
-
-    return categoryDocs.slice(0, 3).map(doc => {
-      const content = language === 'ar' ? doc.contentAr : doc.contentEn;
-      // Extract the first line or title
-      const lines = content.split('\n');
-      return lines[0].replace(/\[|\]/g, '').trim();
-    });
-    } catch (error) {
-      console.error('Error in getTechniqueRecommendations:', error);
-      return [];
-    }
-  },
-
-  /**
-   * Clear the relevance cache (useful for memory management)
-   */
-  clearCache: (): void => {
-    relevanceCache.clear();
   }
 };

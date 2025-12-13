@@ -243,14 +243,7 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack }) =>
       
       setIsStreaming(true);
 
-      // --- 1. CRISIS DETECTION ---
-      const crisisCheck = ragService.detectCrisis(textToSend, language);
-      if (crisisCheck.isCrisis && crisisCheck.severity === 'high' && !isSystemTrigger) {
-        console.warn('🚨 Crisis detected:', crisisCheck.category);
-        // Crisis protocol is already in the knowledge base, RAG will retrieve it
-      }
-
-      // --- 2. RETRIEVE CONTEXT ---
+      // --- 1. RETRIEVE CONTEXT ---
       const relevantMemories = isSystemTrigger ? "" : await memoryService.retrieveRelevantMemories(textToSend, user.username);
       const clinicalContext = ragService.retrieveContext(textToSend, language);
       

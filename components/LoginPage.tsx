@@ -39,10 +39,10 @@ const LoginPage: React.FC<Props> = ({ onLogin, language, setLanguage }) => {
   }, []);
 
   const handleDemoLogin = () => {
-      // Mock user for demo mode
+      // Mock user for demo mode or fallback
       const mockUser: User = {
           name: formData.name || (formData.email.split('@')[0] || 'User'),
-          email: formData.email,
+          email: formData.email || 'demo@sakinnah.app',
           age: formData.age || '25',
           gender: formData.gender,
           username: '@' + (formData.email.split('@')[0] || 'user'),
@@ -50,21 +50,25 @@ const LoginPage: React.FC<Props> = ({ onLogin, language, setLanguage }) => {
           isSubscribed: false,
           voiceSpeed: 1.0
       };
+      // Store flag to know we are in demo/offline mode
+      localStorage.setItem('sakinnah_demo_mode', 'true');
       onLogin(mockUser);
   };
 
   const handleAuth = async (e: React.FormEvent) => {
       e.preventDefault();
-      
-      // Check if backend is configured; if not, use demo mode immediately
-      if (!isSupabaseConfigured()) {
-          console.warn("Supabase not configured. Using demo mode.");
-          handleDemoLogin();
-          return;
-      }
-
       setLoading(true);
       setErrorMsg('');
+      
+      // 1. Check if backend is configured. If not, skip to demo.
+      if (!isSupabaseConfigured()) {
+          console.warn("Supabase not configured. Using local demo mode.");
+          setTimeout(() => {
+              handleDemoLogin();
+              setLoading(false);
+          }, 800); // Small fake delay for UX
+          return;
+      }
 
       try {
           if (view === 'signup') {
@@ -108,23 +112,29 @@ const LoginPage: React.FC<Props> = ({ onLogin, language, setLanguage }) => {
       } catch (error: any) {
           console.error("Auth Error:", error);
           
-          const errMsg = error?.message?.toLowerCase() || '';
-
-          // --- ROBUST FALLBACK FOR DEMO ENVIRONMENT ---
-          // Automatically fall back to local demo mode on any fetch error or missing config
-          if (
+          let errMsg = '';
+          if (typeof error === 'string') errMsg = error.toLowerCase();
+          else if (error?.message) errMsg = error.message.toLowerCase();
+          
+          // Enhanced detection for network/configuration issues
+          // 'failed to fetch' is the standard error for network issues in JS fetch
+          const isNetworkError = 
               errMsg.includes('fetch') || 
               errMsg.includes('load failed') || 
               errMsg.includes('network') ||
               errMsg.includes('apikey') ||
-              errMsg.includes('url')
-          ) {
-              console.warn("Backend unreachable or unconfigured. Falling back to local demo mode.");
+              errMsg.includes('url') || 
+              errMsg.includes('connection') ||
+              error?.name === 'TypeError' || // Common for Fetch failures
+              !error?.status; // API errors usually have a status code
+
+          if (isNetworkError) {
+              console.warn("Backend unreachable. Falling back to local demo mode.");
               handleDemoLogin();
               return; 
           }
 
-          setErrorMsg(error.message);
+          setErrorMsg(error.message || 'An error occurred');
       } finally {
           setLoading(false);
       }
@@ -190,7 +200,7 @@ const LoginPage: React.FC<Props> = ({ onLogin, language, setLanguage }) => {
         <div className="p-8 -mt-6 bg-white rounded-t-[2rem] relative z-20 shadow-[0_-10px_40px_rgba(0,0,0,0.1)]">
              
              {errorMsg && (
-                 <div className="bg-red-50 text-red-500 text-xs p-3 rounded-xl mb-4 flex items-center gap-2">
+                 <div className="bg-red-50 text-red-500 text-xs p-3 rounded-xl mb-4 flex items-center gap-2 animate-shake">
                      <CircleAlert size={16} /> {errorMsg}
                  </div>
              )}

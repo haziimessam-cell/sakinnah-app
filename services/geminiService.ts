@@ -8,11 +8,15 @@ let aiClient: GoogleGenAI | null = null;
 // Securely access API key based on environment (Vite or standard process.env)
 // Note: In a real production app, use a proxy server. Client-side keys are risky.
 const getApiKey = () => {
-    // Check various env patterns
-    if (typeof process !== 'undefined' && process.env?.API_KEY) return process.env.API_KEY;
-    // Cast import.meta to any to avoid TS error: Property 'env' does not exist on type 'ImportMeta'
-    if (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_KEY) return (import.meta as any).env.VITE_API_KEY;
-    return process.env.API_KEY; // Fallback
+    try {
+        if (typeof process !== 'undefined' && process.env?.API_KEY) return process.env.API_KEY;
+    } catch (e) {}
+    
+    try {
+        if (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_KEY) return (import.meta as any).env.VITE_API_KEY;
+    } catch (e) {}
+    
+    return undefined;
 };
 
 const apiKey = getApiKey();
@@ -56,12 +60,6 @@ export const initializeChat = async (
 };
 
 export const sendMessageStreamToGemini = async function* (message: string, language: Language = 'ar') {
-  if (!message || typeof message !== 'string') {
-    console.warn('Invalid message to sendMessageStreamToGemini');
-    yield language === 'ar' ? "عذراً، الرسالة غير صالحة." : "Invalid message.";
-    return;
-  }
-
   if (chatSession) {
     try {
         const result = await chatSession.sendMessageStream({ message });
@@ -76,18 +74,13 @@ export const sendMessageStreamToGemini = async function* (message: string, langu
     }
     return;
   }
-
+  
   // Fallback if no API key
   yield language === 'ar' ? "يرجى إضافة مفتاح API لتمكين المحادثة." : "Please add an API Key to enable chat.";
 };
 
 // Helper for single-turn tasks (Journal Analysis, Memory Extraction)
 export const generateContent = async (prompt: string, systemInstruction?: string) => {
-    if (!prompt || typeof prompt !== 'string') {
-        console.warn('Invalid prompt to generateContent');
-        return null;
-    }
-
     if (aiClient) {
         try {
             const response = await aiClient.models.generateContent({
@@ -109,19 +102,13 @@ export const generateContent = async (prompt: string, systemInstruction?: string
 
 // Embedding Generation for Vector Search (Memory)
 export const getEmbedding = async (text: string): Promise<number[] | null> => {
-    if (!text || typeof text !== 'string') {
-        console.warn('Invalid text to getEmbedding');
-        return null;
-    }
-
     if (aiClient) {
         try {
             const response = await aiClient.models.embedContent({
                 model: 'text-embedding-004',
                 contents: text
             });
-            // Fix: Use 'embeddings' array instead of 'embedding'
-            return response.embeddings?.[0]?.values || null;
+            return response.embedding?.values || null;
         } catch (e) {
             console.error("Embedding Error", e);
             return null;
