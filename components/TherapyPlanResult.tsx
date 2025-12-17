@@ -69,7 +69,23 @@ const TherapyPlanResult: React.FC<Props> = ({ category, language, answers, onBoo
       setResult(diagnosis);
   }, [category, answers]);
 
-  // --- 3. CLINICAL CONTENT DATABASE ---
+  // --- 3. Save Plan for Booking System ---
+  useEffect(() => {
+      if (result) {
+          const duration = getSessionDuration(result.severity);
+          const sessions = getSessionsCount(result.severity);
+          
+          localStorage.setItem('sakinnah_current_plan', JSON.stringify({
+              severity: result.severity,
+              duration: duration,
+              sessions: sessions,
+              score: result.score,
+              category: category.id
+          }));
+      }
+  }, [result, category]);
+
+  // --- 4. CLINICAL CONTENT DATABASE ---
   const getDiagnosisContent = (catId: string, severity: Severity, score: number, maxScore: number): DiagnosisResult => {
       
       let base: DiagnosisResult = {
@@ -152,11 +168,21 @@ const TherapyPlanResult: React.FC<Props> = ({ category, language, answers, onBoo
       return base;
   };
 
-  const getSessionsCount = () => {
-      if (!result) return 1;
-      if (result.severity === 'severe') return 3;
-      if (result.severity === 'moderate') return 2;
+  // Helper: Determine Sessions Count
+  const getSessionsCount = (severity: Severity | undefined) => {
+      const s = severity || (result ? result.severity : 'minimal');
+      if (s === 'severe') return 3;
+      if (s === 'moderate') return 2;
       return 1;
+  };
+
+  // Helper: Determine Duration (30-45 mins)
+  const getSessionDuration = (severity: Severity | undefined) => {
+      const s = severity || (result ? result.severity : 'minimal');
+      // Minimal/Mild -> 30 mins (Check-in/Maintenance)
+      // Moderate/Severe -> 45 mins (Deep Therapy)
+      if (s === 'minimal' || s === 'mild') return 30;
+      return 45;
   };
 
   const getIntensityPercentage = () => {
@@ -216,7 +242,7 @@ const TherapyPlanResult: React.FC<Props> = ({ category, language, answers, onBoo
             </div>
         </div>
 
-        {/* Reassurance Message (The "Containment" Card) */}
+        {/* Reassurance Message */}
         <div className="px-6 py-2">
             <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-[2rem] p-6 shadow-lg shadow-indigo-500/30 text-white relative overflow-hidden">
                 <div className="absolute top-[-20%] right-[-10%] w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
@@ -250,13 +276,13 @@ const TherapyPlanResult: React.FC<Props> = ({ category, language, answers, onBoo
                     <div>
                         <div className="text-xs text-gray-500 mb-1 font-medium">{language === 'ar' ? 'عدد الجلسات' : 'Sessions'}</div>
                         <div className="text-lg font-bold text-gray-800">
-                            {getSessionsCount()} {t.sessionsPerWeek}
+                            {getSessionsCount(result.severity)} {t.sessionsPerWeek}
                         </div>
                     </div>
                     <div className="h-8 w-px bg-gray-200"></div>
                     <div>
                         <div className="text-xs text-gray-500 mb-1 font-medium">{language === 'ar' ? 'المدة' : 'Duration'}</div>
-                        <div className="text-lg font-bold text-gray-800">45 {t.minutes}</div>
+                        <div className="text-lg font-bold text-gray-800">{getSessionDuration(result.severity)} {t.minutes}</div>
                     </div>
                 </div>
             </div>

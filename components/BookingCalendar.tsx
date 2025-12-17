@@ -22,6 +22,20 @@ const BookingCalendar: React.FC<Props> = ({ onBack, onConfirm, language, user, m
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [planDuration, setPlanDuration] = useState(45); // Default
+
+  // Load Plan Details from Storage (generated in TherapyPlanResult)
+  useEffect(() => {
+      const savedPlan = localStorage.getItem('sakinnah_current_plan');
+      if (savedPlan) {
+          try {
+              const parsed = JSON.parse(savedPlan);
+              if (parsed.duration) setPlanDuration(parsed.duration);
+          } catch(e) {
+              console.error("Failed to load plan", e);
+          }
+      }
+  }, []);
 
   // Generate next 14 days starting from minDaysInFuture
   const generateDates = () => {
@@ -116,10 +130,10 @@ const BookingCalendar: React.FC<Props> = ({ onBack, onConfirm, language, user, m
           if (Notification.permission === 'granted') {
                const dateStr = selectedDate.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US');
                const title = isRescheduleMode ? t.rescheduleSuccess : t.bookingConfirmedTitle;
-               // UPDATED: Include 40 mins duration in notification
+               // UPDATED: Dynamic duration
                const body = language === 'ar' 
-                    ? `تم الحجز يوم ${dateStr} الساعة ${selectedTime}. مدة الجلسة: 40 دقيقة.` 
-                    : `Booking confirmed for ${dateStr} at ${selectedTime}. Duration: 40 mins.`;
+                    ? `تم الحجز يوم ${dateStr} الساعة ${selectedTime}. مدة الجلسة: ${planDuration} دقيقة.` 
+                    : `Booking confirmed for ${dateStr} at ${selectedTime}. Duration: ${planDuration} mins.`;
                
                new Notification(title, {
                    body: body,
@@ -168,7 +182,7 @@ const BookingCalendar: React.FC<Props> = ({ onBack, onConfirm, language, user, m
                       <div className="text-2xl font-bold text-gray-900 mb-2">{selectedTime}</div>
                       <div className="flex items-center gap-1 text-xs text-gray-500 font-medium bg-gray-50 w-fit px-2 py-1 rounded-md">
                           <Clock size={12} />
-                          <span>40 {language === 'ar' ? 'دقيقة' : 'mins'}</span>
+                          <span>{planDuration} {language === 'ar' ? 'دقيقة' : 'mins'}</span>
                       </div>
                   </div>
               </div>
@@ -223,7 +237,7 @@ const BookingCalendar: React.FC<Props> = ({ onBack, onConfirm, language, user, m
             {/* Time Slots */}
             <div className="animate-slideUp">
                  <h2 className="text-sm font-bold text-gray-600 mb-3 px-1 flex items-center gap-2">
-                    <Clock size={16} /> {t.availableSlots}
+                    <Clock size={16} /> {t.availableSlots} <span className="text-xs font-normal opacity-70">({planDuration} {t.minutes})</span>
                 </h2>
                 
                 <div className="grid grid-cols-3 gap-3 mb-4">

@@ -1,3 +1,4 @@
+
 import React, { ErrorInfo, ReactNode } from 'react';
 import { translations } from '../translations';
 import { RefreshCcw, AlertTriangle } from 'lucide-react';
@@ -12,10 +13,13 @@ interface State {
 }
 
 class ErrorBoundary extends React.Component<Props, State> {
-  public state: State = {
-    hasError: false,
-    error: null
-  };
+  constructor(props: Props) {
+    super(props);
+    this.state = {
+      hasError: false,
+      error: null
+    };
+  }
 
   public static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
@@ -35,16 +39,16 @@ class ErrorBoundary extends React.Component<Props, State> {
       // Safe fallback for language
       const savedLang = localStorage.getItem('sakinnah_lang');
       const lang: 'ar' | 'en' = (savedLang === 'en' || savedLang === 'ar') ? savedLang : 'ar';
-      const t = translations[lang];
+      const t = translations[lang] as any;
 
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-slate-900 p-6 text-center animate-fadeIn">
           <div className="w-24 h-24 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center text-red-500 mb-6 shadow-sm">
              <AlertTriangle size={48} />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">{t.errorTitle}</h1>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">{t.errorTitle || 'Error'}</h1>
           <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-xs mx-auto leading-relaxed">
-            {t.errorDesc}
+            {t.errorDesc || 'An unexpected error occurred.'}
             <br />
             <span className="text-xs opacity-70 mt-2 block font-mono">{this.state.error?.message}</span>
           </p>
@@ -53,7 +57,7 @@ class ErrorBoundary extends React.Component<Props, State> {
             className="px-8 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl font-bold shadow-lg flex items-center gap-2 transition-all active:scale-95"
           >
             <RefreshCcw size={18} />
-            {t.reloadApp}
+            {t.reloadApp || 'Reload'}
           </button>
         </div>
       );

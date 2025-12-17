@@ -133,4 +133,14 @@ export interface Memory {
     embedding?: number[]; // Vector embedding for semantic search
 }
 
+// Added ClinicalDocument to fix ragService error
+export interface ClinicalDocument {
+  id: string;
+  category: string;
+  tags: string[];
+  contentAr: string;
+  contentEn: string;
+  source: string;
+}
+
 export type ViewState = 'LOGIN' | 'HOME' | 'CHAT' | 'DISCLAIMER' | 'PROFILE' | 'SETTINGS' | 'HELP' | 'BREATHING' | 'GARDEN' | 'DREAM' | 'GROUNDING' | 'BOOKING' | 'SLEEP_TOOL' | 'SUBSCRIPTION' | 'JOURNAL' | 'EMERGENCY_CHAT' | 'FADFADA' | 'ASSESSMENT' | 'PLAN';
