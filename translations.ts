@@ -311,7 +311,7 @@ export const translations = {
     recommendedSessions: "عدد الجلسات الموصى بها",
     sessionsPerWeek: "جلسات أسبوعياً",
     intensityLevel: "مستوى الكثافة",
-    bookSession: "حجز جلسة مع سكينة مباشرة",
+    bookSession: "حجز جلسة مع ماما مي",
     startAiChat: "البدء مع سكينة الآن",
     bookingToast: "تم إرسال طلب الحجز، سنوافيك بالتفاصيل قريباً.",
     highIntensity: "مكثف",
