@@ -1,7 +1,6 @@
 
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 
-// Audio Contexts for Recording and Playback
 let nextStartTime = 0;
 let inputAudioContext: AudioContext | null = null;
 let outputAudioContext: AudioContext | null = null;
@@ -9,7 +8,6 @@ let scriptProcessor: ScriptProcessorNode | null = null;
 let audioSource: MediaStreamAudioSourceNode | null = null;
 const activeSources = new Set<AudioBufferSourceNode>();
 
-// Manual Base64 Implementation as per rules
 function encodeBase64(bytes: Uint8Array): string {
   let binary = '';
   const len = bytes.byteLength;
@@ -65,25 +63,30 @@ export const liveVoiceService = {
 
   async connect(config: { 
     systemInstruction: string, 
-    voiceName: 'Puck' | 'Charon' | 'Kore' | 'Fenrir' | 'Aoife' | 'Zephyr',
-    onMessage?: (text: string) => void,
-    onVolumeUpdate?: (volume: number) => void
+    voiceName: 'Puck' | 'Charon' | 'Kore' | 'Fenrir' | 'Zephyr',
+    onTranscript?: (text: string) => void,
+    onVolumeUpdate?: (volume: number) => void,
+    onError?: (error: any) => void
   }) {
-    this.stop(); // Clear any previous session
+    this.stop(); 
 
-    // Create a new instance right before the call to ensure fresh key
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
     inputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
     outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
     
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    let stream: MediaStream;
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) {
+        config.onError?.(e);
+        return;
+    }
     
     this.sessionPromise = ai.live.connect({
       model: 'gemini-2.5-flash-native-audio-preview-09-2025',
       callbacks: {
         onopen: () => {
-          console.log("🎙️ Live Session Opened");
+          console.log("🎙️ Live Voice Session Started");
           if (!inputAudioContext || !this.sessionPromise) return;
           
           audioSource = inputAudioContext.createMediaStreamSource(stream);
@@ -92,13 +95,12 @@ export const liveVoiceService = {
           scriptProcessor.onaudioprocess = (e) => {
             const inputData = e.inputBuffer.getChannelData(0);
             
-            // Volume visualizer calculation
+            // Calc volume for UI
             let sum = 0;
             for(let i=0; i<inputData.length; i++) sum += inputData[i] * inputData[i];
             config.onVolumeUpdate?.(Math.sqrt(sum / inputData.length));
 
             const pcmBlob = createAudioBlob(inputData);
-            // Ensure data is sent only after session promise resolves
             this.sessionPromise?.then(session => {
               session.sendRealtimeInput({ media: pcmBlob });
             });
@@ -108,19 +110,19 @@ export const liveVoiceService = {
           scriptProcessor.connect(inputAudioContext.destination);
         },
         onmessage: async (message: LiveServerMessage) => {
-          // 1. Handle Transcriptions
-          if (message.serverContent?.modelTurn?.parts?.[0]?.text) {
-             config.onMessage?.(message.serverContent.modelTurn.parts[0].text);
+          // Handle Model Transcription
+          if (message.serverContent?.outputTranscription) {
+             config.onTranscript?.(message.serverContent.outputTranscription.text);
           }
 
-          // 2. Handle Interruption
+          // Handle Interruption (Critical for Realism)
           if (message.serverContent?.interrupted) {
             activeSources.forEach(s => { try { s.stop(); } catch(e){} });
             activeSources.clear();
             nextStartTime = 0;
           }
 
-          // 3. Handle Audio Output
+          // Handle Audio Output
           const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
           if (base64Audio && outputAudioContext) {
             nextStartTime = Math.max(nextStartTime, outputAudioContext.currentTime);
@@ -134,14 +136,15 @@ export const liveVoiceService = {
             source.buffer = audioBuffer;
             source.connect(outputAudioContext.destination);
             source.onended = () => activeSources.delete(source);
-            
-            // Schedule smooth gapless playback
             source.start(nextStartTime);
             nextStartTime += audioBuffer.duration;
             activeSources.add(source);
           }
         },
-        onerror: (e) => console.error("Live Error:", e),
+        onerror: (e) => {
+            console.error("Live Error:", e);
+            config.onError?.(e);
+        },
         onclose: () => console.log("Live Session Closed"),
       },
       config: {
@@ -150,6 +153,7 @@ export const liveVoiceService = {
           voiceConfig: { prebuiltVoiceConfig: { voiceName: config.voiceName } },
         },
         systemInstruction: config.systemInstruction,
+        outputAudioTranscription: {},
       },
     });
   },

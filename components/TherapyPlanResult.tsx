@@ -32,13 +32,10 @@ const TherapyPlanResult: React.FC<Props> = ({ category, language, answers, onBoo
   const isRTL = language === 'ar';
   const [result, setResult] = useState<DiagnosisResult | null>(null);
 
-  // --- 1. SCORING ENGINE ---
   const calculateScore = () => {
       let total = 0;
       answers.forEach(ans => {
-          // Normalize string to avoid issues with hidden characters or spaces
           const cleanAns = ans.trim();
-          
           if (cleanAns.includes('أبداً') || cleanAns.includes('Not at all')) total += 0;
           else if (cleanAns.includes('عدة أيام') || cleanAns.includes('Several days')) total += 1;
           else if (cleanAns.includes('أكثر من نصف') || cleanAns.includes('More than half')) total += 2;
@@ -47,51 +44,25 @@ const TherapyPlanResult: React.FC<Props> = ({ category, language, answers, onBoo
       return total;
   };
 
-  // --- 2. DIAGNOSTIC LOGIC ---
   useEffect(() => {
       const score = calculateScore();
-      // Assume 10 questions * 3 max points = 30 max score
-      const maxScore = 30; 
+      const maxScore = answers.length * 3; 
       
       let severity: Severity = 'minimal';
-      
-      // Standard GAD-7 / PHQ-9 Cutoffs:
-      // 0-4: Minimal
-      // 5-9: Mild
-      // 10-14: Moderate
-      // 15+: Severe
-      if (score <= 4) severity = 'minimal';
-      else if (score <= 9) severity = 'mild';
-      else if (score <= 14) severity = 'moderate';
+      if (score <= maxScore * 0.2) severity = 'minimal';
+      else if (score <= maxScore * 0.45) severity = 'mild';
+      else if (score <= maxScore * 0.7) severity = 'moderate';
       else severity = 'severe';
 
       const diagnosis = getDiagnosisContent(category.id, severity, score, maxScore);
       setResult(diagnosis);
   }, [category, answers]);
 
-  // --- 3. Save Plan for Booking System ---
-  useEffect(() => {
-      if (result) {
-          const duration = getSessionDuration(result.severity);
-          const sessions = getSessionsCount(result.severity);
-          
-          localStorage.setItem('sakinnah_current_plan', JSON.stringify({
-              severity: result.severity,
-              duration: duration,
-              sessions: sessions,
-              score: result.score,
-              category: category.id
-          }));
-      }
-  }, [result, category]);
-
-  // --- 4. CLINICAL CONTENT DATABASE ---
   const getDiagnosisContent = (catId: string, severity: Severity, score: number, maxScore: number): DiagnosisResult => {
-      
       let base: DiagnosisResult = {
           score, maxScore, severity,
-          clinicalTitleAr: 'تقييم الصحة النفسية العام',
-          clinicalTitleEn: 'General Mental Health Assessment',
+          clinicalTitleAr: 'تقييم الصحة النفسية',
+          clinicalTitleEn: 'Mental Health Assessment',
           descriptionAr: 'تظهر النتائج بعض التحديات التي يمكن التعامل معها بوعي.',
           descriptionEn: 'Results show some challenges that can be managed with awareness.',
           reassuranceAr: 'أنت لست وحدك، وهذا الشعور مؤقت.',
@@ -99,204 +70,88 @@ const TherapyPlanResult: React.FC<Props> = ({ category, language, answers, onBoo
           color: 'text-gray-600'
       };
 
-      // DEPRESSION (PHQ-9)
       if (catId === 'depression') {
-          if (severity === 'minimal') {
-              base.clinicalTitleAr = 'أعراض عابرة (لا يوجد اكتئاب)';
-              base.clinicalTitleEn = 'Minimal Symptoms (No Depression)';
-              base.descriptionAr = 'المزاج ضمن النطاق الطبيعي. التقلبات الحالية استجابة طبيعية للحياة.';
-              base.descriptionEn = 'Mood is within normal range. Current fluctuations are natural life responses.';
-              base.reassuranceAr = 'أنت بخير. حافظ على نمط حياتك الصحي.';
-              base.reassuranceEn = 'You are doing well. Maintain your healthy lifestyle.';
-              base.color = 'text-green-600';
-          } else if (severity === 'mild') {
-              base.clinicalTitleAr = 'نوبة اكتئاب خفيفة';
-              base.clinicalTitleEn = 'Mild Depressive Episode';
-              base.descriptionAr = 'انخفاض طفيف في الطاقة والمزاج، لكن القدرة على العمل ما زالت موجودة.';
-              base.descriptionEn = 'Slight drop in energy/mood, but functioning remains intact.';
-              base.reassuranceAr = 'هذه غيمة ستمر. الحديث والرياضة كفيلان بتبديدها.';
-              base.reassuranceEn = 'This cloud will pass. Talking and exercise can clear it.';
-              base.color = 'text-yellow-600';
-          } else if (severity === 'moderate') {
-              base.clinicalTitleAr = 'اكتئاب متوسط الشدة';
-              base.clinicalTitleEn = 'Moderate Depression';
-              base.descriptionAr = 'تأثر واضح في النوم والشهية والتركيز. الحياة تتطلب جهداً مضاعفاً.';
-              base.descriptionEn = 'Sleep, appetite, and focus affected. Life feels like double effort.';
-              base.reassuranceAr = 'ألمك حقيقي وله أسباب بيولوجية. أنت تستحق المساعدة لتخفيف هذا الحمل.';
-              base.reassuranceEn = 'Your pain is real and biological. You deserve help to lighten this load.';
-              base.color = 'text-orange-600';
-          } else {
-              base.clinicalTitleAr = 'اكتئاب جسيم (Major Depression)';
-              base.clinicalTitleEn = 'Severe Major Depression';
-              base.descriptionAr = 'سيطرة تامة لمشاعر الحزن وانعدام الشغف، مع تأثير قوي على الوظائف.';
-              base.descriptionEn = 'Total dominance of sadness/anhedonia, strongly impacting function.';
-              base.reassuranceAr = 'هذا "مرض" قابل للشفاء وليس "ضعفاً" فيك. الأدوية والجلسات ستعيد لك توازنك.';
-              base.reassuranceEn = 'This is a treatable illness, not a weakness. Meds and therapy will restore balance.';
-              base.color = 'text-red-600';
-          }
-      } 
-      
-      // ANXIETY (GAD-7)
-      else if (catId === 'anxiety') {
-          if (severity === 'severe') {
-              base.clinicalTitleAr = 'قلق عام شديد (GAD)';
-              base.clinicalTitleEn = 'Severe GAD';
-              base.descriptionAr = 'الجهاز العصبي في حالة طوارئ مستمرة (Fight or Flight).';
-              base.descriptionEn = 'Nervous system in constant Fight or Flight mode.';
-              base.reassuranceAr = 'جسمك يحميك بزيادة، لكن "جرس الإنذار" عالق. سنساعدك على إطفائه.';
-              base.reassuranceEn = 'Your body is over-protecting you. We will help reset the alarm.';
-              base.color = 'text-red-600';
-          } else if (severity === 'moderate') {
-              base.clinicalTitleAr = 'قلق متوسط';
-              base.clinicalTitleEn = 'Moderate Anxiety';
-              base.descriptionAr = 'توتر عضلي وأفكار متسارعة يصعب السيطرة عليها.';
-              base.descriptionEn = 'Muscle tension and racing thoughts hard to control.';
-              base.reassuranceAr = 'القلق كاذب محترف. سنعلمك كيف تكشف خدعه وتسترخي.';
-              base.reassuranceEn = 'Anxiety is a liar. We will teach you to spot its tricks and relax.';
-              base.color = 'text-orange-600';
-          } else {
-              base.clinicalTitleAr = 'قلق بسيط';
-              base.clinicalTitleEn = 'Mild Anxiety';
-              base.descriptionAr = 'قلق ظرفي مرتبط بضغوط حالية.';
-              base.descriptionEn = 'Situational anxiety related to current stressors.';
-              base.reassuranceAr = 'قليل من القلق دافع للإنجاز. تنفس بعمق، أنت مسيطر.';
-              base.reassuranceEn = 'A little anxiety drives success. Breathe, you are in control.';
-              base.color = 'text-yellow-600';
-          }
+          base.clinicalTitleAr = severity === 'severe' ? 'اكتئاب جسيم' : severity === 'moderate' ? 'اكتئاب متوسط' : 'أعراض اكتئاب خفيفة';
+          base.clinicalTitleEn = severity === 'severe' ? 'Major Depression' : severity === 'moderate' ? 'Moderate Depression' : 'Mild Depression';
+          base.color = severity === 'severe' ? 'text-red-600' : 'text-orange-600';
+      } else if (catId === 'anxiety') {
+          base.clinicalTitleAr = severity === 'severe' ? 'قلق عام شديد' : 'قلق بسيط إلى متوسط';
+          base.clinicalTitleEn = severity === 'severe' ? 'Severe Anxiety' : 'Mild to Moderate Anxiety';
+          base.color = severity === 'severe' ? 'text-red-600' : 'text-teal-600';
+      } else if (catId === 'ocd') {
+          base.clinicalTitleAr = 'تقييم الوسواس القهري';
+          base.clinicalTitleEn = 'OCD Evaluation';
+          base.descriptionAr = 'الأفكار المتكررة هي نتاج كيمياء الدماغ وليست حقيقتك.';
+          base.descriptionEn = 'Repetitive thoughts are brain chemistry, not your reality.';
+          base.color = 'text-purple-600';
+      } else if (catId === 'baraem') {
+          base.clinicalTitleAr = 'تقرير نمو الطفل النفسي';
+          base.clinicalTitleEn = 'Child Psychological Report';
+          base.descriptionAr = 'الطفل يمر بمرحلة نمو تتطلب احتواءً خاصاً وتوجيهاً سلوكياً.';
+          base.descriptionEn = 'The child is in a developmental stage requiring special containment.';
+          base.color = 'text-lime-600';
+      } else if (catId === 'relationships') {
+          base.clinicalTitleAr = 'تحليل التوافق العاطفي';
+          base.clinicalTitleEn = 'Relational Compatibility Analysis';
+          base.descriptionAr = 'العلاقات تمر بمنعطفات تتطلب مهارات تواصل جديدة.';
+          base.descriptionEn = 'Relationships face turns that require new communication skills.';
+          base.color = 'text-rose-600';
       }
 
       return base;
   };
 
-  // Helper: Determine Sessions Count
-  const getSessionsCount = (severity: Severity | undefined) => {
-      const s = severity || (result ? result.severity : 'minimal');
-      if (s === 'severe') return 3;
-      if (s === 'moderate') return 2;
-      return 1;
-  };
+  const getSessionsCount = (s: Severity) => (s === 'severe' ? 3 : s === 'moderate' ? 2 : 1);
+  const getSessionDuration = (s: Severity) => (s === 'minimal' || s === 'mild' ? 30 : 45);
 
-  // Helper: Determine Duration (30-45 mins)
-  const getSessionDuration = (severity: Severity | undefined) => {
-      const s = severity || (result ? result.severity : 'minimal');
-      // Minimal/Mild -> 30 mins (Check-in/Maintenance)
-      // Moderate/Severe -> 45 mins (Deep Therapy)
-      if (s === 'minimal' || s === 'mild') return 30;
-      return 45;
-  };
-
-  const getIntensityPercentage = () => {
-      if (!result) return 0;
-      return (result.score / result.maxScore) * 100;
-  };
-
-  if (!result) return <div className="p-10 text-center">Loading Assessment...</div>;
+  if (!result) return null;
 
   return (
     <div className="h-full flex flex-col pt-safe pb-safe bg-gradient-to-b from-indigo-50 via-white to-white animate-fadeIn overflow-y-auto no-scrollbar">
-        
-        {/* Diagnosis Header Card */}
         <div className="p-6 pb-2">
             <div className="bg-white rounded-[2rem] p-6 shadow-xl border border-white/50 relative overflow-hidden">
-                <div className={`absolute top-0 left-0 w-full h-1.5 ${result.severity === 'severe' ? 'bg-red-500' : result.severity === 'moderate' ? 'bg-orange-500' : result.severity === 'mild' ? 'bg-yellow-500' : 'bg-green-500'}`}></div>
-                
+                <div className={`absolute top-0 left-0 w-full h-1.5 ${result.severity === 'severe' ? 'bg-red-500' : result.severity === 'moderate' ? 'bg-orange-500' : 'bg-green-500'}`}></div>
                 <div className="flex justify-between items-start mb-6">
                     <div>
-                        <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1">
-                            <Activity size={12} />
-                            {language === 'ar' ? 'التشخيص المبدئي' : 'Clinical Impression'}
-                        </h2>
-                        <h1 className={`text-xl md:text-2xl font-black ${result.color} leading-tight`}>
-                            {language === 'ar' ? result.clinicalTitleAr : result.clinicalTitleEn}
-                        </h1>
+                        <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Activity size={12} /> {isRTL ? 'النتيجة الإكلينيكية' : 'Clinical Result'}</h2>
+                        <h1 className={`text-xl font-black ${result.color}`}>{isRTL ? result.clinicalTitleAr : result.clinicalTitleEn}</h1>
                     </div>
-                    <div className={`flex flex-col items-center justify-center`}>
-                        <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg ${result.severity === 'severe' ? 'bg-red-500' : result.severity === 'moderate' ? 'bg-orange-500' : result.severity === 'mild' ? 'bg-yellow-500' : 'bg-green-500'}`}>
-                            {result.score}
-                        </div>
-                        <span className="text-[10px] text-gray-400 mt-1 font-mono">/ {result.maxScore}</span>
+                    <div className="text-center">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold bg-gray-800`}>{result.score}</div>
+                        <span className="text-[10px] text-gray-400 font-mono">/ {result.maxScore}</span>
                     </div>
                 </div>
-
-                {/* Score Bar */}
-                <div className="mb-6">
-                    <div className="flex justify-between text-[10px] text-gray-400 mb-1 font-medium">
-                        <span>Min</span>
-                        <span>Severity Scale</span>
-                        <span>Max</span>
-                    </div>
-                    <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                        <div 
-                            className={`h-full rounded-full transition-all duration-1000 ease-out ${result.severity === 'severe' ? 'bg-red-500' : result.severity === 'moderate' ? 'bg-orange-500' : result.severity === 'mild' ? 'bg-yellow-500' : 'bg-green-500'}`} 
-                            style={{ width: `${getIntensityPercentage()}%` }}
-                        ></div>
-                    </div>
-                </div>
-
-                <div className="flex items-start gap-3 bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                    <Info size={20} className="text-indigo-500 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-gray-700 leading-relaxed font-medium">
-                        {language === 'ar' ? result.descriptionAr : result.descriptionEn}
-                    </p>
-                </div>
+                <p className="text-sm text-gray-600 leading-relaxed mb-4">{isRTL ? result.descriptionAr : result.descriptionEn}</p>
             </div>
         </div>
 
-        {/* Reassurance Message */}
         <div className="px-6 py-2">
-            <div className="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-[2rem] p-6 shadow-lg shadow-indigo-500/30 text-white relative overflow-hidden">
-                <div className="absolute top-[-20%] right-[-10%] w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-                
-                <div className="flex items-center gap-3 mb-3">
-                    <HeartHandshake size={24} className="text-pink-300" />
-                    <h3 className="font-bold text-indigo-100 text-sm uppercase tracking-wide">
-                        {language === 'ar' ? 'رسالة طمأنة' : 'Reassurance'}
-                    </h3>
-                </div>
-                
-                <p className="text-lg font-medium leading-relaxed opacity-95">
-                    "{language === 'ar' ? result.reassuranceAr : result.reassuranceEn}"
-                </p>
-                
-                <div className="mt-4 flex items-center gap-2 text-xs text-indigo-200 bg-black/20 w-fit px-3 py-1 rounded-full backdrop-blur-sm border border-white/10">
-                    <ShieldCheck size={12} />
-                    <span>{language === 'ar' ? 'بياناتك آمنة وسرية تماماً' : 'Your data is strictly private'}</span>
-                </div>
+            <div className="bg-indigo-600 rounded-[2rem] p-6 text-white shadow-lg">
+                <h3 className="font-bold text-sm mb-2 opacity-80">{isRTL ? 'توجيه سكينة' : 'Sakinnah Guidance'}</h3>
+                <p className="text-lg font-medium">"{isRTL ? result.reassuranceAr : result.reassuranceEn}"</p>
             </div>
         </div>
 
-        {/* Action Plan */}
-        <div className="p-6 pt-2 pb-10 flex-1 flex flex-col justify-end">
-            <div className="mb-6">
-                <h3 className="text-gray-900 font-bold mb-3 px-2 flex items-center gap-2">
-                    <BarChart3 size={18} className="text-gray-500" />
-                    {language === 'ar' ? 'الخطة المقترحة' : 'Recommended Plan'}
-                </h3>
-                <div className="bg-white border border-gray-200 rounded-2xl p-4 flex items-center justify-between shadow-sm">
-                    <div>
-                        <div className="text-xs text-gray-500 mb-1 font-medium">{language === 'ar' ? 'عدد الجلسات' : 'Sessions'}</div>
-                        <div className="text-lg font-bold text-gray-800">
-                            {getSessionsCount(result.severity)} {t.sessionsPerWeek}
-                        </div>
-                    </div>
-                    <div className="h-8 w-px bg-gray-200"></div>
-                    <div>
-                        <div className="text-xs text-gray-500 mb-1 font-medium">{language === 'ar' ? 'المدة' : 'Duration'}</div>
-                        <div className="text-lg font-bold text-gray-800">{getSessionDuration(result.severity)} {t.minutes}</div>
-                    </div>
+        <div className="p-6 pt-2 flex-1 flex flex-col justify-end">
+            <h3 className="text-gray-900 font-bold mb-3 px-2 flex items-center gap-2"><BarChart3 size={18} /> {isRTL ? 'الخطة المقترحة' : 'Action Plan'}</h3>
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 flex items-center justify-between mb-6 shadow-sm">
+                <div>
+                    <div className="text-xs text-gray-500 mb-1">{isRTL ? 'الجلسات' : 'Sessions'}</div>
+                    <div className="text-lg font-bold text-gray-800">{getSessionsCount(result.severity)} {t.sessionsPerWeek}</div>
+                </div>
+                <div className="h-8 w-px bg-gray-200"></div>
+                <div>
+                    <div className="text-xs text-gray-500 mb-1">{isRTL ? 'المدة' : 'Duration'}</div>
+                    <div className="text-lg font-bold text-gray-800">{getSessionDuration(result.severity)} {t.minutes}</div>
                 </div>
             </div>
 
-            <button 
-                onClick={onBookSession}
-                className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold shadow-xl shadow-gray-900/20 hover:scale-[1.02] transition-all active:scale-95 flex items-center justify-center gap-3 group"
-            >
-                <Calendar size={20} className="text-gray-300" />
+            <button onClick={onBookSession} className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all">
+                <Calendar size={20} />
                 <span>{t.bookSession}</span>
-                {isRTL ? <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" /> : <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />}
+                {isRTL ? <ArrowLeft size={20} /> : <ArrowRight size={20} />}
             </button>
         </div>
-
     </div>
   );
 };

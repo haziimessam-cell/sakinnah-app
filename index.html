@@ -8,12 +8,16 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="format-detection" content="telephone=no">
     <meta name="theme-color" content="#F5F7FA">
+    
+    <!-- PWA Manifest Link -->
+    <link rel="manifest" href="manifest.json">
+    
     <title>Sakinnah - سكينة</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
-        darkMode: 'class', // Enable class-based dark mode
+        darkMode: 'class',
         theme: {
           extend: {
             fontFamily: {
@@ -57,38 +61,14 @@
                 '30%, 50%, 70%': { transform: 'translate3d(-4px, 0, 0)' },
                 '40%, 60%': { transform: 'translate3d(4px, 0, 0)' }
               },
-              fadeIn: {
-                '0%': { opacity: '0' },
-                '100%': { opacity: '1' }
-              },
-              scaleIn: {
-                '0%': { opacity: '0', transform: 'scale(0.95)' },
-                '100%': { opacity: '1', transform: 'scale(1)' }
-              },
-              slideUp: {
-                '0%': { opacity: '0', transform: 'translateY(20px)' },
-                '100%': { opacity: '1', transform: 'translateY(0)' }
-              },
-              slideLeft: {
-                '0%': { transform: 'translateX(-100%)' },
-                '100%': { transform: 'translateX(0)' }
-              },
-              slideRight: {
-                '0%': { transform: 'translateX(100%)' },
-                '100%': { transform: 'translateX(0)' }
-              },
-              'pulse-ring': {
-                '0%': { transform: 'scale(0.8)', opacity: '0.5' },
-                '100%': { transform: 'scale(2.5)', opacity: '0' }
-              },
-              'breathing': {
-                '0%, 100%': { transform: 'scale(1)' },
-                '50%': { transform: 'scale(1.05)' }
-              },
-              'float': {
-                 '0%, 100%': { transform: 'translateY(0) rotate(0deg)' },
-                 '50%': { transform: 'translateY(-20px) rotate(5deg)' }
-              }
+              fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+              scaleIn: { '0%': { opacity: '0', transform: 'scale(0.95)' }, '100%': { opacity: '1', transform: 'scale(1)' } },
+              slideUp: { '0%': { opacity: '0', transform: 'translateY(20px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+              slideLeft: { '0%': { transform: 'translateX(-100%)' }, '100%': { transform: 'translateX(0)' } },
+              slideRight: { '0%': { transform: 'translateX(100%)' }, '100%': { transform: 'translateX(0)' } },
+              'pulse-ring': { '0%': { transform: 'scale(0.8)', opacity: '0.5' }, '100%': { transform: 'scale(2.5)', opacity: '0' } },
+              'breathing': { '0%, 100%': { transform: 'scale(1)' }, '50%': { transform: 'scale(1.05)' } },
+              'float': { '0%, 100%': { transform: 'translateY(0) rotate(0deg)' }, '50%': { transform: 'translateY(-20px) rotate(5deg)' } }
             }
           }
         }
@@ -101,27 +81,14 @@
         overscroll-behavior-y: none;
         touch-action: pan-x pan-y;
       }
-      .dark body {
-        background-color: #0f172a;
-      }
-      
-      .transform-gpu {
-        transform: translate3d(0,0,0);
-        backface-visibility: hidden;
-        perspective: 1000px;
-      }
-
+      .dark body { background-color: #0f172a; }
+      .transform-gpu { transform: translate3d(0,0,0); backface-visibility: hidden; perspective: 1000px; }
       .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
       .pt-safe { padding-top: env(safe-area-inset-top); }
       .min-h-screen-safe { min-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
-      
-      .backdrop-blur-xl {
-        -webkit-backdrop-filter: blur(16px);
-        backdrop-filter: blur(16px);
-      }
-      
+      .backdrop-blur-xl { -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
       html[dir="ltr"] body { font-family: 'Inter', sans-serif; }
       html[dir="rtl"] body { font-family: 'Tajawal', sans-serif; }
     </style>
@@ -138,7 +105,9 @@
     "@capacitor/status-bar": "https://esm.sh/@capacitor/status-bar@^8.0.0",
     "@capacitor/haptics": "https://esm.sh/@capacitor/haptics@^8.0.0",
     "@capacitor/preferences": "https://esm.sh/@capacitor/preferences@^8.0.0",
-    "@capacitor/splash-screen": "https://esm.sh/@capacitor/splash-screen@^8.0.0"
+    "@capacitor/splash-screen": "https://esm.sh/@capacitor/splash-screen@^8.0.0",
+    "vite": "https://esm.sh/vite@^7.3.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
 </script>
