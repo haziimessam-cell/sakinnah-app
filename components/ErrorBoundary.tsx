@@ -15,20 +15,17 @@ interface State {
 /**
  * Robust ErrorBoundary to catch and display UI crashes gracefully.
  */
-// Explicitly inherit from React.Component to ensure TypeScript recognizes inherited properties like setState and props
+// Fix: Use React.Component explicitly to resolve inheritance issues with setState and props
 export default class ErrorBoundary extends React.Component<Props, State> {
-  // Initialize state
+  // Initialize state using the React.Component pattern
   public state: State = { hasError: false, error: null };
-
-  constructor(props: Props) {
-    super(props);
-  }
 
   public static getDerivedStateFromError(error: Error): State {
     // Update state so the next render will show the fallback UI.
     return { hasError: true, error };
   }
 
+  // Lifecycle method to catch errors
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Log the error to the console
     console.error("ErrorBoundary caught an error:", error, errorInfo);
@@ -36,11 +33,12 @@ export default class ErrorBoundary extends React.Component<Props, State> {
 
   // Resets the error state and reloads the application.
   private handleReload = () => {
-    // Accessing setState from the inherited React.Component class to clear the error state.
+    // Fix: Using setState from the React.Component base class
     this.setState({ hasError: false, error: null });
     window.location.reload();
   };
 
+  // Standard render method for class components
   public render(): ReactNode {
     if (this.state.hasError) {
       const savedLang = localStorage.getItem('sakinnah_lang');
@@ -73,7 +71,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
       );
     }
 
-    // Accessing children from the inherited props property of React.Component.
+    // Fix: Accessing children from the React.Component props property
     return this.props.children;
   }
 }

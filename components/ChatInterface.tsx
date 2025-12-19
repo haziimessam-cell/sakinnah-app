@@ -1,24 +1,26 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { User, Message, Role, Category, Language } from '../types';
-import { sendMessageStreamToGemini, initializeChat } from '../services/geminiService';
+import { User, Message, Role, Category, Language, CognitiveNode } from '../types';
+import { sendMessageStreamToGemini, initializeChat, generateContent } from '../services/geminiService';
 import { memoryService } from '../services/memoryService';
 import { ragService } from '../services/ragService';
 import ChatInput from './ChatInput';
 import ChatMessage from './ChatMessage';
 import VoiceOverlay from './VoiceOverlay';
-import { ArrowLeft, ArrowRight, Phone, User as UserIcon, Baby, Apple, GlassWater, Moon, Gamepad2, Smile, Frown, AlertCircle, Heart, Clock } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Phone, Clock, AlertCircle, Brain, Calendar, ShieldCheck, Sparkles, Wind } from 'lucide-react';
 import { translations } from '../translations';
-import { CATEGORY_INSTRUCTIONS, SESSION_CLOSING_PHRASES_AR, SESSION_CLOSING_PHRASES_EN } from '../constants';
+import { CATEGORY_INSTRUCTIONS, SYSTEM_INSTRUCTION_AR, SYSTEM_INSTRUCTION_EN, COGNITIVE_MAP_PROMPT, CLINIC_SESSION_PROTOCOL_AR, CLINIC_SESSION_PROTOCOL_EN } from '../constants';
 
 interface Props {
   user: User;
   category: Category;
   language: Language;
   onBack: () => void;
+  onOpenCanvas: (nodes: CognitiveNode[]) => void;
+  isPrebooked?: boolean;
 }
 
-const ChatInterface: React.FC<Props> = ({ user, category, language, onBack }) => {
+const ChatInterface: React.FC<Props> = ({ user, category, language, onBack, onOpenCanvas, isPrebooked }) => {
   const t = translations[language] as any;
   const isRTL = language === 'ar';
   
@@ -27,8 +29,12 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack }) =>
   const [isStreaming, setIsStreaming] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [showVoiceOverlay, setShowVoiceOverlay] = useState(false);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [cognitiveNodes, setCognitiveNodes] = useState<CognitiveNode[]>([]);
   
+  // Immersive States
+  const [isPreSessionRitual, setIsPreSessionRitual] = useState(isPrebooked);
+  const [ritualStep, setRitualStep] = useState(0);
+
   const SESSION_DURATION = 40 * 60; 
   const [sessionTimeLeft, setSessionTimeLeft] = useState(SESSION_DURATION);
   const [sessionActive, setSessionActive] = useState(true);
@@ -40,13 +46,20 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack }) =>
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isStreaming]);
 
+  // CLINIC RITUAL TIMER
+  useEffect(() => {
+      if (isPrebooked && isPreSessionRitual) {
+          const timer = setTimeout(() => {
+              if (ritualStep < 2) setRitualStep(s => s + 1);
+              else setIsPreSessionRitual(false);
+          }, 3000);
+          return () => clearTimeout(timer);
+      }
+  }, [isPrebooked, isPreSessionRitual, ritualStep]);
+
   const handleSessionEnd = useCallback(() => {
       setSessionActive(false);
-      const phrases = language === 'ar' ? SESSION_CLOSING_PHRASES_AR : SESSION_CLOSING_PHRASES_EN;
-      const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)]
-                           .replace('[NAME]', user.name);
-      setMessages(prev => [...prev, { id: 'closing-' + Date.now(), role: Role.MODEL, text: randomPhrase, timestamp: new Date() }]);
-  }, [language, user.name]);
+  }, []);
 
   useEffect(() => {
       const timer = setInterval(() => {
@@ -61,6 +74,24 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack }) =>
       }, 1000);
       return () => clearInterval(timer);
   }, [handleSessionEnd]);
+
+  const extractCognitiveMap = async (text: string) => {
+      try {
+          const res = await generateContent(COGNITIVE_MAP_PROMPT + `\n\nحوار المستخدم: "${text}"`);
+          if (res) {
+              const clean = res.replace(/```json/g, '').replace(/```/g, '').trim();
+              const newNodesRaw = JSON.parse(clean);
+              if (Array.isArray(newNodesRaw)) {
+                  const processedNodes: CognitiveNode[] = newNodesRaw.map((n, i) => ({
+                      ...n,
+                      x: 100 + (Math.random() * (window.innerWidth - 200)),
+                      y: 150 + (cognitiveNodes.length * 60) + (Math.random() * 100)
+                  }));
+                  setCognitiveNodes(prev => [...prev, ...processedNodes].slice(-12)); 
+              }
+          }
+      } catch (e) { console.warn("Canvas sync error", e); }
+  };
 
   const handleSendMessage = useCallback(async (forcedText?: string, isSystemTrigger: boolean = false) => {
       if (!sessionActive && !isSystemTrigger) return;
@@ -77,10 +108,10 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack }) =>
       const relevantMemories = await memoryService.retrieveRelevantMemories(textToSend, user.username);
       const clinicalContext = ragService.retrieveContext(textToSend, language);
       
-      let finalPrompt = textToSend;
-      if (relevantMemories || clinicalContext) {
-          finalPrompt = `[Memory]: ${relevantMemories}\n[Expert Context]: ${clinicalContext}\n[User Message]: ${textToSend}`;
-      }
+      const minutesPassed = Math.floor((SESSION_DURATION - sessionTimeLeft) / 60);
+      const sessionContext = `[SESSION_TIME_LOG]: ${minutesPassed} mins. ${sessionTimeLeft < 300 ? "WRAP-UP NOW." : ""}`;
+
+      let finalPrompt = `${sessionContext}\n[Memory]: ${relevantMemories}\n[Clinical Source]: ${clinicalContext}\n[User]: ${textToSend}`;
 
       try {
           const stream = sendMessageStreamToGemini(finalPrompt, language);
@@ -94,28 +125,37 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack }) =>
           }
 
           memoryService.extractAndSaveMemory(textToSend + " " + aiText, user.username);
+          if (!isSystemTrigger) extractCognitiveMap(textToSend);
           
-      } catch (e) { 
-          console.error(e); 
-      } finally { 
-          setIsStreaming(false); 
-      }
-  }, [inputText, language, user.username, sessionActive]);
+      } catch (e) { console.error(e); } finally { setIsStreaming(false); }
+  }, [inputText, language, user.username, sessionActive, sessionTimeLeft, cognitiveNodes]);
 
   useEffect(() => {
+    // Wait for ritual before init
+    if (isPreSessionRitual) return;
+
     const initGemini = async () => {
+        const aiGender = user.gender === 'male' ? 'Female' : 'Male';
+        const characterProfile = language === 'ar' 
+            ? `أنت الآن معالج نفسي (${aiGender === 'Male' ? 'ذكر' : 'أنثى'}) تتحدث مع ${user.gender === 'male' ? 'رجل' : 'امرأة'}.`
+            : `You are now a ${aiGender} therapist speaking with a ${user.gender}.`;
+        
         const expertConfig = CATEGORY_INSTRUCTIONS[category.id] || { ar: "", en: "" };
-        const baseInstruction = language === 'ar' ? expertConfig.ar : expertConfig.en;
+        const categoryInstruction = language === 'ar' ? expertConfig.ar : expertConfig.en;
         
-        // Pass user's name as the primary context
-        await initializeChat(`User Name: ${user.name}, Age: ${user.age}`, baseInstruction, undefined, language);
+        const bookingContext = isPrebooked 
+            ? (language === 'ar' ? CLINIC_SESSION_PROTOCOL_AR : CLINIC_SESSION_PROTOCOL_EN)
+            : '';
+
+        const fullInstruction = `${language === 'ar' ? SYSTEM_INSTRUCTION_AR : SYSTEM_INSTRUCTION_EN}\n${characterProfile}\n${categoryInstruction}\n${bookingContext}`;
         
-        // Send initial greeting with name
-        const greetingPrompt = language === 'ar' 
-          ? `ألقِ التحية على ${user.name} وادعُه للحديث عن مشاعره بخصوص ${t[`cat_${category.id}_title`] || category.id}.`
-          : `Greet ${user.name} and invite them to talk about their feelings regarding ${t[`cat_${category.id}_title`] || category.id}.`;
+        await initializeChat(`User: ${user.name}, Session Type: ${category.id}, Scheduled: ${isPrebooked}`, fullInstruction, undefined, language);
         
-        handleSendMessage(greetingPrompt, true);
+        const startPrompt = language === 'ar' 
+            ? `ابدأ الجلسة العلاجية الرسمية مع ${user.name}. لقد كنت تراجع ملفه.` 
+            : `Start the formal clinic session with ${user.name}. You've been reviewing his records.`;
+            
+        handleSendMessage(startPrompt, true);
     };
     initGemini();
 
@@ -125,7 +165,7 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack }) =>
         recognitionRef.current.lang = language === 'ar' ? 'ar-EG' : 'en-US';
         recognitionRef.current.onresult = (event: any) => setInputText(prev => prev + ' ' + event.results[0][0].transcript);
     }
-  }, [category.id, language, user.name, user.age]);
+  }, [category.id, language, user.name, user.gender, isPrebooked, isPreSessionRitual]);
 
   const formatTime = (seconds: number) => {
       const mins = Math.floor(seconds / 60);
@@ -133,33 +173,76 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack }) =>
       return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  if (isPreSessionRitual) {
+      return (
+          <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center text-white p-8 animate-fadeIn">
+               <div className="relative mb-12">
+                   <div className="absolute inset-0 bg-primary-500/20 rounded-full blur-3xl animate-pulse"></div>
+                   <div className="relative w-32 h-32 bg-white/5 rounded-full border border-white/10 flex items-center justify-center">
+                       {ritualStep === 0 ? <ShieldCheck size={64} className="text-primary-400" /> : 
+                        ritualStep === 1 ? <Wind size={64} className="text-teal-400 animate-breathing" /> : 
+                        <Sparkles size={64} className="text-amber-400" />}
+                   </div>
+               </div>
+               <div className="text-center space-y-4">
+                   <h2 className="text-3xl font-black tracking-tighter uppercase">
+                       {ritualStep === 0 ? (isRTL ? 'تشفير الاتصال..' : 'Securing Line..') : 
+                        ritualStep === 1 ? (isRTL ? 'خذ نفساً عميقاً..' : 'Take a deep breath..') : 
+                        (isRTL ? 'المعالج جاهز الآن' : 'Therapist is ready')}
+                   </h2>
+                   <p className="text-gray-400 text-sm font-medium italic">
+                       {ritualStep === 0 ? (isRTL ? 'نحن نهتم بخصوصيتك لأقصى درجة' : 'We take your privacy seriously') : 
+                        ritualStep === 1 ? (isRTL ? 'استعد للهدوء والتركيز' : 'Prepare for calm and focus') : 
+                        (isRTL ? 'جاري دخول الغرفة العلاجية' : 'Entering the session room')}
+                   </p>
+               </div>
+          </div>
+      );
+  }
+
   return (
-    <div className="h-full flex flex-col bg-slate-50 relative">
+    <div className={`h-full flex flex-col relative animate-fadeIn transition-colors duration-1000 ${isPrebooked ? 'bg-[#f8fafc]' : 'bg-slate-50'}`}>
       {showVoiceOverlay && (
-          <VoiceOverlay 
-            category={category} 
-            language={language} 
-            user={user}
-            onClose={() => setShowVoiceOverlay(false)} 
-          />
+          <VoiceOverlay category={category} language={language} user={user} onClose={() => setShowVoiceOverlay(false)} />
       )}
 
-      <header className="px-4 py-3 bg-white shadow-sm flex items-center justify-between z-10 sticky top-0">
+      <header className="px-4 py-3 bg-white/80 backdrop-blur-xl shadow-sm flex items-center justify-between z-10 sticky top-0 border-b border-gray-100">
           <div className="flex items-center gap-3">
-              <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                  {isRTL ? <ArrowRight size={24} /> : <ArrowLeft size={24} />}
+              <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-xl transition-all">
+                  {isRTL ? <ArrowRight size={22} /> : <ArrowLeft size={22} />}
               </button>
               <div>
-                  <h1 className="font-bold text-gray-800 text-lg leading-tight">{t[`cat_${category.id}_title`] || category.id}</h1>
-                  <p className="text-xs text-primary-600 font-medium">{formatTime(sessionTimeLeft)} {isRTL ? 'متبقي' : 'left'}</p>
+                  <h1 className="font-bold text-gray-800 text-base leading-tight flex items-center gap-2">
+                    {isPrebooked && <div className="w-2 h-2 bg-teal-500 rounded-full animate-pulse"></div>}
+                    {t[`cat_${category.id}_title`] || category.id}
+                  </h1>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                      <div className={`w-1.5 h-1.5 rounded-full ${sessionTimeLeft < 300 ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
+                      <p className={`text-[10px] font-bold uppercase tracking-wider ${sessionTimeLeft < 300 ? 'text-red-600' : 'text-primary-600'}`}>
+                          {formatTime(sessionTimeLeft)}
+                      </p>
+                  </div>
               </div>
           </div>
-          <div className="flex gap-2 items-center">
-              <button onClick={() => setShowVoiceOverlay(true)} className="p-2 text-primary-600 bg-primary-50 rounded-full hover:bg-primary-100 transition-colors shadow-sm"><Phone size={20} /></button>
+          <div className="flex items-center gap-2">
+              <button onClick={() => onOpenCanvas(cognitiveNodes)} className="p-2.5 text-primary-600 bg-primary-50 rounded-xl hover:bg-primary-100 transition-all shadow-sm relative">
+                  <Brain size={20} />
+                  {cognitiveNodes.length > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-pink-500 rounded-full animate-ping"></span>}
+              </button>
+              <button onClick={() => setShowVoiceOverlay(true)} className="p-2.5 text-primary-600 bg-primary-50 rounded-xl hover:bg-primary-100 transition-all shadow-sm">
+                  <Phone size={20} />
+              </button>
           </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+      {isPrebooked && messages.length < 3 && (
+          <div className="bg-teal-50 px-4 py-2 border-b border-teal-100 flex items-center gap-2 text-[10px] font-bold text-teal-700 animate-slideDown">
+              <Calendar size={12} />
+              {isRTL ? 'هذه جلسة عيادة متكاملة محجوزة مسبقاً.' : 'This is a pre-booked full clinic session.'}
+          </div>
+      )}
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-5 no-scrollbar bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-fixed">
           {messages.map((msg) => (
               <ChatMessage 
                 key={msg.id} 
@@ -167,7 +250,7 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack }) =>
                 language={language} 
                 isStreaming={isStreaming && msg.id === messages[messages.length - 1].id} 
                 isSpeaking={false} 
-                copiedId={copiedId} 
+                copiedId={null} 
                 onSpeak={()=>{}} 
                 onCopy={()=>{}} 
                 onBookmark={()=>{}} 
@@ -176,26 +259,27 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack }) =>
           <div ref={messagesEndRef} />
       </div>
 
-      {sessionActive && (
+      {sessionActive ? (
           <ChatInput 
             inputText={inputText} 
             setInputText={setInputText} 
             onSend={() => handleSendMessage()} 
             isListening={isListening} 
             onToggleMic={() => { 
-                if (isListening) { 
-                    recognitionRef.current?.stop(); 
-                    setIsListening(false); 
-                } else { 
-                    recognitionRef.current?.start(); 
-                    setIsListening(true); 
-                } 
+                if (isListening) { recognitionRef.current?.stop(); setIsListening(false); } 
+                else { recognitionRef.current?.start(); setIsListening(true); } 
             }} 
             isStreaming={isStreaming} 
             language={language} 
             t={t} 
             isRTL={isRTL} 
           />
+      ) : (
+          <div className="p-6 bg-white border-t border-gray-100 text-center animate-slideUp">
+              <button onClick={onBack} className="w-full py-3 bg-gray-900 text-white rounded-xl font-bold shadow-lg transition-all">
+                  {isRTL ? 'العودة للرئيسية' : 'Back Home'}
+              </button>
+          </div>
       )}
     </div>
   );

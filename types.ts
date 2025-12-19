@@ -12,52 +12,59 @@ export interface Message {
   isBookmarked?: boolean;
 }
 
-export interface SavedMessage {
-  id: string;
-  text: string;
-  category: string;
-  timestamp: Date;
+export interface CognitiveNode {
+    id: string;
+    label: string;
+    type: 'thought' | 'belief' | 'distortion';
+    description: string;
+    x: number;
+    y: number;
 }
 
-export interface SessionSummary {
-  id: string;
-  date: Date;
-  category: string;
-  points: string[];
-  mood?: string;
+export interface SandboxScenario {
+    id: string;
+    titleAr: string;
+    titleEn: string;
+    icon: string;
+    descriptionAr: string;
+    descriptionEn: string;
+    difficulty: 'easy' | 'medium' | 'hard';
+    durationMinutes: number;
+    personaAr: string;
+    personaEn: string;
 }
 
-export interface BookedSession {
-  id: string;
-  date: Date;
-  time: string;
-  type: 'ai_guided' | 'human_expert';
-  status: 'upcoming' | 'completed';
+export interface SimulationMetrics {
+    assertiveness: number;
+    empathy: number;
+    clarity: number;
+    emotionalControl: number;
+    persuasion: number;
 }
 
-export interface Category {
-  id: string;
-  icon: string; // Lucide icon name or emoji
-  color: string;
-  isSpecialized?: boolean; // For Baraem or Relationships
+export interface ViewState {
+    type: 'LOGIN' | 'HOME' | 'CHAT' | 'DISCLAIMER' | 'PROFILE' | 'SETTINGS' | 'HELP' | 'BREATHING' | 'GARDEN' | 'DREAM' | 'GROUNDING' | 'BOOKING' | 'SLEEP_TOOL' | 'SUBSCRIPTION' | 'JOURNAL' | 'EMERGENCY_CHAT' | 'FADFADA' | 'ASSESSMENT' | 'PLAN' | 'CBT_CANVAS' | 'SOCIAL_SANDBOX';
 }
-
-export type Gender = 'male' | 'female';
-export type Language = 'ar' | 'en';
 
 export interface User {
   name: string;
   email: string;
   age: string;
-  gender: Gender;
-  username: string; // New: Unique ID
-  partner?: string; // New: Linked Partner
-  registrationDate: string; // ISO Date String
-  isSubscribed?: boolean; // True if paid
-  pinCode?: string; // Encrypted/Stored PIN for App Lock
-  voiceSpeed?: number; // 0.5 to 2.0
-  emergencyContact?: string; // Custom number
+  gender: 'male' | 'female';
+  username: string;
+  partner?: string;
+  registrationDate: string;
+  isSubscribed?: boolean;
+  pinCode?: string;
+  voiceSpeed?: number;
+  emergencyContact?: string;
 }
+
+export type Language = 'ar' | 'en';
+export type ViewStateName = ViewState['type'];
+
+// Added missing exports to fix TS errors in other files
+export type Gender = User['gender'];
 
 export interface Question {
   id: string;
@@ -67,73 +74,73 @@ export interface Question {
   optionsEn: string[];
 }
 
-export interface AssessmentResult {
-  [key: string]: string;
+export interface Achievement {
+  id: string;
+  titleAr: string;
+  titleEn: string;
+  icon: string;
+  unlocked: boolean;
+}
+
+export interface MonthlyReport {
+  id: string;
+  month: string;
+  summaryAr: string;
+  summaryEn: string;
+}
+
+export interface Category {
+  id: string;
+  icon: string;
+  color: string;
+}
+
+export interface BookedSession {
+  id: string;
+  date: Date;
+  time: string;
+  type: string;
+  status: 'upcoming' | 'completed' | 'cancelled';
+  categoryId?: string;
 }
 
 export interface TherapyPlan {
   category: string;
   severity: string;
-  sessionsPerWeek: number;
-  sessionDuration: number; // Minutes
-  focusArea: string;
-  nextMilestone: string;
-}
-
-export interface MonthlyReport {
-  id: string;
-  monthAr: string;
-  monthEn: string;
-  childName: string;
-  diagnosisAr: string;
-  diagnosisEn: string;
-  progressScore: number; // 0-100
-  behavioralImprovementsAr: string[];
-  behavioralImprovementsEn: string[];
-  academicRecommendationsAr: string[];
-  academicRecommendationsEn: string[];
-  socialSkillsStatusAr: string;
-  socialSkillsStatusEn: string;
-  clinicalNotes: string;
-}
-
-export interface Achievement {
-  id: string;
-  titleAr: string;
-  titleEn: string;
-  descriptionAr: string;
-  descriptionEn: string;
-  icon: string;
-  unlocked: boolean;
+  score: number;
 }
 
 export interface JournalEntry {
-    id: string;
-    date: Date;
-    text: string;
-    tags: string[];
-    sentiment: 'positive' | 'neutral' | 'negative';
-}
-
-export interface DailyChallenge {
   id: string;
-  titleAr: string;
-  titleEn: string;
-  icon: string;
-  color: string;
+  date: Date | string;
+  text: string;
+  tags?: string[];
+  sentiment: 'positive' | 'neutral' | 'negative';
 }
 
-// --- NEW: Long Term Memory ---
+export interface SavedMessage {
+  id: string;
+  role: Role;
+  text: string;
+  timestamp: Date;
+}
+
+export interface SessionSummary {
+  id: string;
+  category: string;
+  points: string[];
+  date: string;
+}
+
 export interface Memory {
-    id: string;
-    content: string; // The fact (e.g., "Boss name is Ahmed")
-    tags: string[]; // Keywords for retrieval (e.g., "work", "boss", "stress")
-    importance: number; // 1-5
-    timestamp: string;
-    embedding?: number[]; // Vector embedding for semantic search
+  id: string;
+  content: string;
+  tags: string[];
+  importance: number;
+  timestamp: string;
+  embedding?: number[];
 }
 
-// Added ClinicalDocument to fix ragService error
 export interface ClinicalDocument {
   id: string;
   category: string;
@@ -142,5 +149,3 @@ export interface ClinicalDocument {
   contentEn: string;
   source: string;
 }
-
-export type ViewState = 'LOGIN' | 'HOME' | 'CHAT' | 'DISCLAIMER' | 'PROFILE' | 'SETTINGS' | 'HELP' | 'BREATHING' | 'GARDEN' | 'DREAM' | 'GROUNDING' | 'BOOKING' | 'SLEEP_TOOL' | 'SUBSCRIPTION' | 'JOURNAL' | 'EMERGENCY_CHAT' | 'FADFADA' | 'ASSESSMENT' | 'PLAN';

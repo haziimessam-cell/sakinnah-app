@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Category, Language, User } from '../types';
-import { X, Mic, VolumeX, Phone, HeartHandshake, Sprout, Sparkles, Moon } from 'lucide-react';
+import { X, Mic, VolumeX, Phone, HeartHandshake, Sprout, Sparkles, Moon, User as UserIcon } from 'lucide-react';
 import { translations } from '../translations';
 import { liveVoiceService } from '../services/liveVoiceService';
 
@@ -24,27 +24,22 @@ const VoiceOverlay: React.FC<Props> = ({ category, language, user, onClose }) =>
   
   const getCharacterConfig = () => {
       const name = user.name;
+      const aiGender = user.gender === 'male' ? 'Female' : 'Male';
+
       if (category.id === 'baraem') {
           return {
               voice: 'Kore' as const, 
               instruction: language === 'ar' 
-                ? `أنتِ 'ماما مي'، خبيرة تربوية مصرية حنونة جداً. صوتك دافئ ومشجع. نادِ المستخدم دائماً باسمه: ${name}. استخدمي العامية المصرية البسيطة. قولي: 'يا حبيبي'، 'يا بطل'. أنتِ هنا لاحتواء الطفل أو الولي. كوني صبورة جداً واستخدمي نبرة صوت تعكس الحنان والأمان.`
-                : `You are 'Mama Mai', a warm parenting expert. Always address the user as ${name}. Your voice is nurturing and encouraging. Use simple, loving language.`
+                ? `أنتِ 'ماما مي'، خبيرة تربوية حنونة جداً. نادِ ${name} بعبارات دافئة مثل 'يا بطل'. استخدمي لهجة مصرية دافئة جداً كأنك أم حقيقية.`
+                : `You are 'Mama Mai', a warm parenting expert. Speak nurturingly to ${name} as if you are a real mother.`
           };
       }
-      if (category.id === 'sleep') {
-          return {
-              voice: 'Zephyr' as const, 
-              instruction: language === 'ar'
-                ? `أنتِ خبيرة نوم حكيمة ودافئة. نادِ المستخدم باسمه: ${name}. تحدثي ببطء شديد وبنبرة مهدئة جداً للنوم. استخدمي كلمات دافئة مثل 'ارتاح يا ${name}'. أنتِ تحكين قصصاً تجلب السكينة للأرواح المتعبة. كوني هادئة كالليل.`
-                : `You are a wise and warm sleep expert. Always address the user as ${name}. Speak very slowly and soothingly. Your goal is to help them relax and sleep.`
-          };
-      }
+      
       return {
-          voice: 'Charon' as const, 
+          voice: aiGender === 'Male' ? 'Charon' : 'Kore' as any, 
           instruction: language === 'ar'
-            ? `أنت 'سكينة'، رفيق نفسي ذكي ومتعاطف. نادِ المستخدم دائماً باسمه: ${name}. هدفك الاستماع العميق وتقديم الدعم بكلمات قليلة ومركزة تعكس الفهم التام لمشاعر المستخدم. كن هادئاً، حكيماً، وغير حكمي تماماً.`
-            : `You are 'Sakinnah', a smart and empathetic psychological companion. Always address the user as ${name}. Focus on deep listening and validating their feelings.`
+            ? `أنت الآن معالج نفسي (${aiGender === 'Male' ? 'ذكر' : 'أنثى'}). نادِ المستخدم باسمه: ${name}. كن شديد الواقعية، دافئاً، ومحترفاً في إدارة الحوار الصوتي.`
+            : `You are now a ${aiGender} therapist. Always address the user as ${name}. Be realistic, warm, and professional.`
       };
   };
 
@@ -65,7 +60,7 @@ const VoiceOverlay: React.FC<Props> = ({ category, language, user, onClose }) =>
     return () => {
         liveVoiceService.stop();
     };
-  }, [category.id, language, user.name]);
+  }, [category.id, language, user.name, user.gender]);
 
   return (
     <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-3xl flex flex-col items-center justify-center animate-fadeIn pt-safe pb-safe">
@@ -85,16 +80,14 @@ const VoiceOverlay: React.FC<Props> = ({ category, language, user, onClose }) =>
 
               <div className={`w-48 h-48 ${category.color} rounded-full flex items-center justify-center shadow-[0_0_100px_rgba(56,189,248,0.3)] relative z-10 border-4 border-white/20 transition-all duration-300 ${userVolume > 0.05 ? 'scale-105' : 'scale-100'}`}>
                  {category.id === 'baraem' ? <Sprout size={100} className="text-white" /> : 
-                  category.id === 'sleep' ? <Moon size={100} className="text-indigo-200" /> :
-                  <HeartHandshake size={100} className="text-white" />}
+                  <UserIcon size={100} className="text-white" />}
               </div>
           </div>
 
           <div className="text-center space-y-6 max-w-sm">
               <div className="space-y-1">
                   <h2 className="text-3xl font-black text-white tracking-tight">
-                    {category.id === 'baraem' ? (isRTL ? 'ماما مي' : 'Mama Mai') : 
-                     category.id === 'sleep' ? (isRTL ? 'حواديت النوم' : 'Sleep Tales') : catTitle}
+                    {category.id === 'baraem' ? (isRTL ? 'ماما مي' : 'Mama Mai') : catTitle}
                   </h2>
                   <p className="text-primary-400 text-xs font-bold uppercase tracking-[0.2em]">{t.online || 'Live'}</p>
               </div>
