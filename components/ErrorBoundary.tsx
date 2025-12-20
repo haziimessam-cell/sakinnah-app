@@ -15,14 +15,15 @@ interface State {
 /**
  * Robust ErrorBoundary to catch and display UI crashes gracefully.
  */
-// Extending Component with defined Props and State types
-export default class ErrorBoundary extends Component<Props, State> {
+// Fix: Explicitly extend React.Component to resolve TS compilation issues with inherited members
+export default class ErrorBoundary extends React.Component<Props, State> {
+  public state: State = {
+    hasError: false,
+    error: null,
+  };
+
   constructor(props: Props) {
     super(props);
-    this.state = {
-      hasError: false,
-      error: null,
-    };
   }
 
   // Update state so the next render will show the fallback UI.
@@ -38,16 +39,17 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   // Resets the error state and reloads the application.
   private handleReload = () => {
+    // setState is now correctly typed as a member of Component
     this.setState({ hasError: false, error: null });
     window.location.reload();
   };
 
   public render(): ReactNode {
-    // Accessing state property correctly via 'this'
+    // Access state via class instance
     if (this.state.hasError) {
       const savedLang = localStorage.getItem('sakinnah_lang');
       const lang: 'ar' | 'en' = (savedLang === 'en' || savedLang === 'ar') ? (savedLang as 'ar' | 'en') : 'ar';
-      const t = translations[lang] as any;
+      const t = (translations as any)[lang];
 
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-slate-900 p-6 text-center animate-fadeIn">
@@ -75,7 +77,7 @@ export default class ErrorBoundary extends Component<Props, State> {
       );
     }
 
-    // Accessing props property correctly via 'this'
+    // Access props from the correctly typed base class
     return this.props.children;
   }
 }

@@ -34,16 +34,8 @@ export interface SandboxScenario {
     personaEn: string;
 }
 
-export interface SimulationMetrics {
-    assertiveness: number;
-    empathy: number;
-    clarity: number;
-    emotionalControl: number;
-    persuasion: number;
-}
-
 export interface ViewState {
-    type: 'LOGIN' | 'HOME' | 'CHAT' | 'DISCLAIMER' | 'PROFILE' | 'SETTINGS' | 'HELP' | 'BREATHING' | 'GARDEN' | 'DREAM' | 'GROUNDING' | 'BOOKING' | 'SLEEP_TOOL' | 'SUBSCRIPTION' | 'JOURNAL' | 'EMERGENCY_CHAT' | 'FADFADA' | 'ASSESSMENT' | 'PLAN' | 'CBT_CANVAS' | 'SOCIAL_SANDBOX';
+    type: 'LOGIN' | 'HOME' | 'CHAT' | 'DISCLAIMER' | 'PROFILE' | 'SETTINGS' | 'HELP' | 'BREATHING' | 'GARDEN' | 'DREAM' | 'GROUNDING' | 'BOOKING' | 'SLEEP_TOOL' | 'SUBSCRIPTION' | 'JOURNAL' | 'EMERGENCY_CHAT' | 'FADFADA' | 'ASSESSMENT' | 'PLAN' | 'CBT_CANVAS' | 'SOCIAL_SANDBOX' | 'RELATIONSHIP_HUB' | 'EMPATHY_TRANSLATOR' | 'ATTACHMENT_MAPPER' | 'CO_REGULATOR' | 'MEDIATOR' | 'SLEEP_SANCTUARY';
 }
 
 export interface User {
@@ -62,8 +54,6 @@ export interface User {
 
 export type Language = 'ar' | 'en';
 export type ViewStateName = ViewState['type'];
-
-// Added missing exports to fix TS errors in other files
 export type Gender = User['gender'];
 
 export interface Question {

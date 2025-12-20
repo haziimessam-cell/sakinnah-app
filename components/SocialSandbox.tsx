@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { User, Language, SandboxScenario, Message, Role, SimulationMetrics } from '../types';
+// Fix: Removed SimulationMetrics which is not exported from types.ts
+import { User, Language, SandboxScenario, Message, Role } from '../types';
 import { translations } from '../translations';
 import { SANDBOX_SCENARIOS, SANDBOX_SYSTEM_PROMPT } from '../constants';
 import { initializeChat, sendMessageStreamToGemini } from '../services/geminiService';
