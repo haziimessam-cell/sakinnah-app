@@ -13,7 +13,7 @@ async function callWithRetry<T>(fn: () => Promise<T>, retries = 5, delay = 8000)
     const isQuotaError = errorMsg.includes('429') || error?.status === 429 || errorMsg.includes('RESOURCE_EXHAUSTED');
     if (isQuotaError && retries > 0) {
       const nextDelay = delay * 1.5; 
-      console.warn(`API Rate Limit. Waiting ${nextDelay}ms...`);
+      console.warn(`AI Brain is busy. Waiting ${nextDelay}ms...`);
       await new Promise(resolve => setTimeout(resolve, nextDelay));
       return callWithRetry(fn, retries - 1, nextDelay);
     }
@@ -30,22 +30,25 @@ export const initializeChat = async (
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const defaultBase = language === 'ar' ? SYSTEM_INSTRUCTION_AR : SYSTEM_INSTRUCTION_EN;
   const baseInstruction = baseInstructionOverride || defaultBase;
-  const fullSystemInstruction = `${baseInstruction}\n\n[Clinical Context]: ${contextPrompt}`;
+  
+  // دمج السياق السريري مع التعليمات الأساسية
+  const fullSystemInstruction = `${baseInstruction}\n\n[Clinical Context]: ${contextPrompt}\n[Instruction]: Provide deep, empathetic, and expert-level psychological guidance.`;
 
   try {
     chatSession = ai.chats.create({
       model: "gemini-3-pro-preview", 
       config: {
         systemInstruction: fullSystemInstruction,
-        temperature: 0.85, 
-        topP: 0.95,
-        thinkingConfig: { thinkingBudget: 16384 } // High-level reasoning for autonomous session management
+        temperature: 0.75, // درجة حرارة متوازنة لضمان الدقة والتعاطف
+        topP: 0.9,
+        // تفعيل ميزانية التفكير العميق لتحليل الحالات المعقدة
+        thinkingConfig: { thinkingBudget: 32768 } 
       },
       history: history 
     });
     return chatSession;
   } catch (error) {
-    console.error("Failed to initialize chat", error);
+    console.error("Failed to initialize intelligent chat", error);
     throw error;
   }
 };
@@ -61,20 +64,22 @@ export const sendMessageStreamToGemini = async function* (message: string, langu
       if (text) yield text;
     }
   } catch (error: any) {
-    console.error("Gemini Stream Error:", error);
-    yield language === 'ar' ? "أنا معك، أفكر في كلماتك بعمق..." : "I'm with you, processing your words deeply...";
+    console.error("Intelligent Stream Error:", error);
+    yield language === 'ar' ? "أنا معك، أفكر في كلماتك بعمق هادئ..." : "I'm with you, reflecting on your words with calm depth...";
   }
 };
 
+// ... بقية الوظائف تظل كما هي مع استخدام موديلات Gemini 3 لضمان الجودة
 export const generateContent = async (prompt: string, systemInstruction?: string) => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     try {
         const response = (await callWithRetry(() => ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: "gemini-3-pro-preview",
             contents: prompt,
             config: {
                 systemInstruction: systemInstruction,
-                responseMimeType: "application/json"
+                responseMimeType: "application/json",
+                thinkingConfig: { thinkingBudget: 8192 }
             }
         }))) as GenerateContentResponse;
         return response.text;

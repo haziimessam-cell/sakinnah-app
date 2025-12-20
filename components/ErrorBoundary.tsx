@@ -15,9 +15,8 @@ interface State {
 /**
  * Robust ErrorBoundary to catch and display UI crashes gracefully.
  */
-// Use React.Component explicitly to ensure inheritance works correctly across different TypeScript/React environments
-export default class ErrorBoundary extends React.Component<Props, State> {
-  // Initialize state in the constructor to ensure it's correctly typed on the instance
+// Extending Component with defined Props and State types
+export default class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = {
@@ -39,13 +38,12 @@ export default class ErrorBoundary extends React.Component<Props, State> {
 
   // Resets the error state and reloads the application.
   private handleReload = () => {
-    // setState is an inherited method from React.Component
     this.setState({ hasError: false, error: null });
     window.location.reload();
   };
 
   public render(): ReactNode {
-    // state is an inherited property from React.Component
+    // Accessing state property correctly via 'this'
     if (this.state.hasError) {
       const savedLang = localStorage.getItem('sakinnah_lang');
       const lang: 'ar' | 'en' = (savedLang === 'en' || savedLang === 'ar') ? (savedLang as 'ar' | 'en') : 'ar';
@@ -77,7 +75,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
       );
     }
 
-    // props is an inherited property from React.Component
+    // Accessing props property correctly via 'this'
     return this.props.children;
   }
 }

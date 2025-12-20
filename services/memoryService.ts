@@ -4,7 +4,8 @@ import { generateContent, getEmbedding } from "./geminiService";
 import { MEMORY_EXTRACTION_PROMPT, INSIGHTS_SYSTEM_PROMPT_AR, INSIGHTS_SYSTEM_PROMPT_EN } from "../constants";
 
 /**
- * ELEPHANT MEMORY SERVICE (Local Vector Store)
+ * محرك الذاكرة العميقة (The Elephant Memory Engine)
+ * يقوم بتحليل السياق النفسي وحفظه كمتجهات (Vectors) للرجوع إليها لاحقاً.
  */
 
 const cosineSimilarity = (vecA: number[], vecB: number[]) => {
@@ -25,8 +26,17 @@ export const memoryService = {
     
     async extractAndSaveMemory(userText: string, username: string): Promise<void> {
         try {
-            const prompt = `${MEMORY_EXTRACTION_PROMPT}\n\nUser Text to Analyze: "${userText}"`;
-            const jsonStr = await generateContent(prompt);
+            // تحديث البرومبت ليكون أكثر تركيزاً على الحالة النفسية
+            const enhancedPrompt = `
+            Analyze this therapeutic dialogue. Extract:
+            1. Key Emotional Triggers.
+            2. Core Beliefs revealed.
+            3. Significant Life Events mentioned.
+            4. Behavioral Patterns.
+            Return as a clean JSON list of memory objects.
+            Dialogue: "${userText}"`;
+
+            const jsonStr = await generateContent(enhancedPrompt);
             if (!jsonStr) return;
             const cleanJson = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim();
             let memories: any[] = [];
@@ -57,9 +67,10 @@ export const memoryService = {
                     }
                 }
             }
-            if (existingMemories.length > 50) {
+            // الاحتفاظ بأهم 100 ذكرى نفسية
+            if (existingMemories.length > 100) {
                 existingMemories.sort((a, b) => b.importance - a.importance);
-                existingMemories = existingMemories.slice(0, 50);
+                existingMemories = existingMemories.slice(0, 100);
             }
             localStorage.setItem(key, JSON.stringify(existingMemories));
         } catch (e) { console.error("Memory Extraction Failed", e); }
@@ -81,41 +92,31 @@ export const memoryService = {
         }));
 
         const relevant = scoredMemories
-            .filter(item => item.score > 0.55) 
+            .filter(item => item.score > 0.6) // زيادة دقة المطابقة
             .sort((a, b) => b.score - a.score)
-            .slice(0, 4)
+            .slice(0, 5)
             .map(item => item.mem);
 
-        const critical = memories.filter(m => m.importance === 5);
-        const uniqueMemories = Array.from(new Set([...relevant, ...critical].map(m => m.id)))
-            .map(id => [...relevant, ...critical].find(m => m.id === id));
-
-        if (uniqueMemories.length === 0) return "";
-        return `\n[RECALLED_MEMORIES]:\n${uniqueMemories.map(m => `- ${m?.content}`).join('\n')}\n`;
+        if (relevant.length === 0) return "";
+        return `\n[PSYCHOLOGICAL_CONTEXT_RECALLED]:\n${relevant.map(m => `- ${m?.content}`).join('\n')}\n`;
     },
 
-    /**
-     * HYPER-CONTEXTUAL INSIGHTS ENGINE
-     * Connects Dots between Journals, Dreams, and Past Sessions
-     */
     async generateDeepInsights(username: string, language: 'ar' | 'en' = 'ar'): Promise<any[]> {
         try {
-            // 1. Collect all raw context
             const memories = JSON.parse(localStorage.getItem(`sakinnah_memories_${username}`) || '[]');
             const journals = JSON.parse(localStorage.getItem('sakinnah_journal') || '[]');
             const summaries = JSON.parse(localStorage.getItem('sakinnah_summaries') || '[]');
 
             if (memories.length < 3 && journals.length < 2) return [];
 
-            // 2. Prepare data for Gemini (Aggregated String)
             const contextData = {
                 significantMemories: memories.map((m: any) => m.content),
-                journalExcerpts: journals.slice(0, 10).map((j: any) => j.text),
+                journalExcerpts: journals.slice(0, 15).map((j: any) => j.text),
                 sessionThemes: summaries.map((s: any) => s.category + ": " + s.points.join(', '))
             };
 
             const systemPrompt = language === 'ar' ? INSIGHTS_SYSTEM_PROMPT_AR : INSIGHTS_SYSTEM_PROMPT_EN;
-            const userPrompt = `DATA TO ANALYZE:\n${JSON.stringify(contextData)}`;
+            const userPrompt = `PERFORM DEEP BEHAVIORAL ANALYSIS ON THIS DATA:\n${JSON.stringify(contextData)}`;
 
             const result = await generateContent(userPrompt, systemPrompt);
             if (!result) return [];
