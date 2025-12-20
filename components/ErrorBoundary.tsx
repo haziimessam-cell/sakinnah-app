@@ -1,5 +1,5 @@
 
-import React, { ErrorInfo, ReactNode } from 'react';
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { translations } from '../translations';
 import { RefreshCcw, AlertTriangle } from 'lucide-react';
 
@@ -15,31 +15,37 @@ interface State {
 /**
  * Robust ErrorBoundary to catch and display UI crashes gracefully.
  */
-// Fix: Use React.Component explicitly to resolve inheritance issues with setState and props
+// Use React.Component explicitly to ensure inheritance works correctly across different TypeScript/React environments
 export default class ErrorBoundary extends React.Component<Props, State> {
-  // Initialize state using the React.Component pattern
-  public state: State = { hasError: false, error: null };
+  // Initialize state in the constructor to ensure it's correctly typed on the instance
+  constructor(props: Props) {
+    super(props);
+    this.state = {
+      hasError: false,
+      error: null,
+    };
+  }
 
+  // Update state so the next render will show the fallback UI.
   public static getDerivedStateFromError(error: Error): State {
-    // Update state so the next render will show the fallback UI.
     return { hasError: true, error };
   }
 
-  // Lifecycle method to catch errors
+  // Lifecycle method to catch errors and log diagnostic information
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log the error to the console
+    // Log the error to the console for debugging
     console.error("ErrorBoundary caught an error:", error, errorInfo);
   }
 
   // Resets the error state and reloads the application.
   private handleReload = () => {
-    // Fix: Using setState from the React.Component base class
+    // setState is an inherited method from React.Component
     this.setState({ hasError: false, error: null });
     window.location.reload();
   };
 
-  // Standard render method for class components
   public render(): ReactNode {
+    // state is an inherited property from React.Component
     if (this.state.hasError) {
       const savedLang = localStorage.getItem('sakinnah_lang');
       const lang: 'ar' | 'en' = (savedLang === 'en' || savedLang === 'ar') ? (savedLang as 'ar' | 'en') : 'ar';
@@ -71,7 +77,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
       );
     }
 
-    // Fix: Accessing children from the React.Component props property
+    // props is an inherited property from React.Component
     return this.props.children;
   }
 }

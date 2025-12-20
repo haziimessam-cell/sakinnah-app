@@ -196,7 +196,7 @@ const ProfilePage: React.FC<Props> = ({ user, onBack, language, onUpdateUser, on
                                <div className="flex items-center gap-3">
                                    <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-indigo-300 border border-white/10"><Brain size={22} /></div>
                                    <div>
-                                       <h3 className="font-black text-lg tracking-tight uppercase">{isRTL ? 'ذاكرة سكينة الفائقة' : 'SAKINNAH DEEP INSIGHTS'}</h3>
+                                       <h3 className="text-xl font-normal tracking-wide font-logo">{isRTL ? 'ذاكرة سكينة' : 'Sakinnah Insights'}</h3>
                                        <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">{isRTL ? 'تحليل الأنماط العميقة' : 'Cross-Context Pattern Analysis'}</p>
                                    </div>
                                </div>
