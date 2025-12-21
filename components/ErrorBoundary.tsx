@@ -1,3 +1,4 @@
+
 import React, { ErrorInfo, ReactNode } from 'react';
 import { translations } from '../translations';
 import { RefreshCcw, AlertTriangle } from 'lucide-react';
@@ -14,9 +15,9 @@ interface State {
 /**
  * Robust ErrorBoundary to catch and display UI crashes gracefully.
  */
-// Explicitly extending React.Component with typed Props and State to resolve 'state' and 'props' type errors.
+// Fix: Use React.Component explicitly to ensure type inheritance for setState and props is recognized by the compiler
 export default class ErrorBoundary extends React.Component<Props, State> {
-  // Use property initializer for state to ensure it's correctly typed within the class
+  // Use property initializer for state
   public state: State = {
     hasError: false,
     error: null,
@@ -35,7 +36,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
 
   // Resets the error state and reloads the page to attempt application recovery
   private handleReload = () => {
-    // Resetting state using the inherited setState method from Component
+    // Fix: Accessing setState from React.Component base class
     this.setState({ hasError: false, error: null });
     window.location.reload();
   };
@@ -73,7 +74,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
       );
     }
 
-    // Returning children from this.props when no error condition is met
+    // Fix: Accessing props from React.Component base class
     return this.props.children;
   }
 }

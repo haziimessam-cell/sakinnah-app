@@ -66,18 +66,51 @@ Your logic is rooted in the following scientific rules:
    - Always start with "Emotional Validation".
    - Use Socratic Questioning to help users identify Cognitive Distortions.
 `;
-// ... بقية الثوابت
+
 export const RELATIONSHIP_PROTOCOL_AR = "بروتوكول الوساطة في العلاقات الزوجية باستخدام مبادئ غوتمان.";
 export const RELATIONSHIP_PROTOCOL_EN = "Relationship mediation protocol based on Gottman principles.";
 export const EMPATHY_TRANSLATOR_PROMPT = "You are an empathy translator. Convert aggressive messages into non-violent communication.";
 export const ACHIEVEMENTS: Achievement[] = [ { id: 'a1', titleAr: "البداية", titleEn: "The Beginning", icon: 'Flag', unlocked: true } ];
+// Fix: Fixed typo in property name from 'summary En' to 'summaryEn' and ensured 'summaryAr' is present.
 export const MOCK_REPORTS: MonthlyReport[] = [ { id: 'r1', month: 'January', summaryAr: "ملخص شهر يناير", summaryEn: "January Summary" } ];
 export const DREAM_SYSTEM_INSTRUCTION_AR = "أنت خبير في تحليل الأحلام النفسي بناءً على مدارس يونغ وفرويد.";
 export const DREAM_SYSTEM_INSTRUCTION_EN = "You are a psychological dream analyst based on Jungian and Freudian schools.";
-export const GRANDMA_STORY_PROMPT_AR = "احكِ حكاية قبل النوم للأطفال بأسلوب دافئ وهادئ.";
-export const GRANDMA_STORY_PROMPT_EN = "Tell a bedtime story for children in a warm and calm style.";
-export const STORY_ELEMENTS_AR = { heroes: ["سندباد", "ليلى", "فارس الشجاع"], settings: ["غابة مسحورة", "جزيرة بعيدة", "قصر في الغيوم"], themes: ["الشجاعة", "الصداقة", "الاكتشاف"], objects: ["خريطة قديمة", "مصباح سحري", "ريشة طائرة"] };
-export const STORY_ELEMENTS_EN = { heroes: ["Sinbad", "Lily", "Brave Knight"], settings: ["Enchanted Forest", "Distant Island", "Castle in the Clouds"], themes: ["Bravery", "Friendship", "Discovery"], objects: ["Old Map", "Magic Lamp", "Flying Feather"] };
+
+// تفعيل نمط القصة السريع والمثير
+export const GRANDMA_STORY_PROMPT_AR = `أنت حكواتي محترف للأطفال. 
+المهمة: تأليف حكاية مغامرة فائقة الإثارة وسريعة الأحداث.
+القواعد:
+1. ابدأ فوراً بحدث مفاجئ أو خطر داهم.
+2. قلل من الوصف والتمهيد، اجعل الأفعال تتلاحق (ركض، قفز، اكتشف، واجه).
+3. استخدم أسلوب "التشويق المستمر" (Cliffhangers) بين الفقرات.
+4. اجعل الجمل قصيرة وقوية النبرة.
+5. الشخصية: [HERO]، المكان: [SETTING]، الغرض: [OBJECT].
+اجعل الطفل يشعر بالانبهار والحماس مع كل جملة.`;
+
+export const GRANDMA_STORY_PROMPT_EN = `You are a pro-storyteller for kids.
+Task: Create a high-octane, fast-paced adventure story.
+Rules:
+1. Start immediately with a surprise or sudden danger.
+2. Minimize descriptions; focus on rapid actions (running, jumping, discovering, facing).
+3. Use continuous suspense/cliffhangers between paragraphs.
+4. Keep sentences short, punchy, and energetic.
+5. Hero: [HERO], Setting: [SETTING], Object: [OBJECT].
+Keep the child on the edge of their seat!`;
+
+export const STORY_ELEMENTS_AR = { 
+    heroes: ["سندباد المغامر", "الفارس البرق", "ليلى صائدة التنانين"], 
+    settings: ["بركان مشتعل", "سفينة فضائية مفقودة", "غابة الوحوش"], 
+    themes: ["الهروب الكبير", "البحث عن الكنز", "المعركة الحاسمة"], 
+    objects: ["سيف الضوء", "خريطة الأسرار", "المفتاح الذهبي"] 
+};
+
+export const STORY_ELEMENTS_EN = { 
+    heroes: ["Sinbad the Bold", "Lightning Knight", "Lily Dragon-Slayer"], 
+    settings: ["Active Volcano", "Lost Spaceship", "Monster Woods"], 
+    themes: ["Great Escape", "Treasure Hunt", "Final Battle"], 
+    objects: ["Light Saber", "Map of Secrets", "Golden Key"] 
+};
+
 export const SLEEP_MUSIC_TRACKS = [ { id: 't1', titleAr: "أمواج هادئة", titleEn: "Calm Waves", url: "https://example.com/waves.mp3", color: "blue" }, { id: 't2', titleAr: "مطر خفيف", titleEn: "Light Rain", url: "https://example.com/rain.mp3", color: "teal" } ];
 export const MUSIC_CONDUCTOR_PROMPT_AR = "أنت مايسترو الهدوء، صف الأجواء الموسيقية للنوم.";
 export const MUSIC_CONDUCTOR_PROMPT_EN = "You are the maestro of calm, describe the musical atmosphere for sleep.";

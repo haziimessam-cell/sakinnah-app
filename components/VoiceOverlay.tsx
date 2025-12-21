@@ -26,26 +26,37 @@ const VoiceOverlay: React.FC<Props> = ({ category, language, user, onClose }) =>
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // إعداد نموذج الشخصية
-  const config = {
-      voice: (user.gender === 'male' ? 'Charon' : 'Kore') as any,
-      instruction: language === 'ar' 
-        ? `أنت الآن في وضع "البصيرة الكاملة". نادِ المستخدم باسمه: ${user.name}. 
+  // منطق اختيار الصوت والتعليمات بناءً على اللغة والجنس
+  const getVoiceConfig = () => {
+    if (language === 'ar') {
+      return {
+        voiceName: (user.gender === 'male' ? 'Charon' : 'Kore') as any,
+        instruction: `أنت الآن في وضع "البصيرة الكاملة". نادِ المستخدم باسمه: ${user.name}. 
+           تحدث بالعربية الفصحى المعاصرة بأسلوب هادئ ومحترف. 
            إذا كانت الكاميرا مفعلة، حلل تعبيرات وجهه ووضعيته بحذر وتعاطف. 
            ركز على نبرة الصوت. كن معالجاً نفسياً محترفاً بأسلوب سقراطي.`
-        : `You are in "Full Insight" mode. Call the user by name: ${user.name}. 
-           If camera is on, analyze facial expressions and posture with care. 
-           Focus on vocal prosody. Be a professional Socratic therapist.`
+      };
+    } else {
+      return {
+        voiceName: (user.gender === 'male' ? 'Zephyr' : 'Puck') as any,
+        instruction: `You are in "Full Insight" mode. Speak EXCLUSIVELY in English. 
+           Call the user by name: ${user.name}. 
+           Be a professional, empathetic clinical psychologist.
+           If the camera is on, analyze facial expressions and body language to provide deeper emotional support. 
+           Use a Socratic therapeutic style.`
+      };
+    }
   };
+
+  const config = getVoiceConfig();
 
   useEffect(() => {
     liveVoiceService.connect({
-        voiceName: config.voice,
+        voiceName: config.voiceName,
         systemInstruction: config.instruction,
         onTranscript: (text) => {
             setTranscript(text);
             setAiState('speaking');
-            // استخراج كلمات مفتاحية بسيطة للعرض
             if (text.length > 10) {
                 const words = text.split(' ').slice(-2);
                 setDetectedKeywords(prev => [...new Set([...prev, ...words])].slice(-5));
@@ -61,15 +72,12 @@ const VoiceOverlay: React.FC<Props> = ({ category, language, user, onClose }) =>
     return () => liveVoiceService.stop();
   }, [language, user.name]);
 
-  // إدارة الكاميرا والبث البصري
   useEffect(() => {
     let interval: any;
     if (isVideoOn && videoRef.current) {
         navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
             .then(stream => {
                 if (videoRef.current) videoRef.current.srcObject = stream;
-                
-                // إرسال لقطات للذكاء الاصطناعي كل ثانية
                 interval = setInterval(() => {
                     if (videoRef.current && canvasRef.current) {
                         const ctx = canvasRef.current.getContext('2d');
@@ -77,7 +85,6 @@ const VoiceOverlay: React.FC<Props> = ({ category, language, user, onClose }) =>
                         canvasRef.current.height = 300;
                         ctx?.drawImage(videoRef.current, 0, 0, 300, 300);
                         const base64Data = canvasRef.current.toDataURL('image/jpeg', 0.5).split(',')[1];
-                        
                         liveVoiceService.sessionPromise?.then(session => {
                             session.sendRealtimeInput({ media: { data: base64Data, mimeType: 'image/jpeg' } });
                         });
@@ -95,14 +102,11 @@ const VoiceOverlay: React.FC<Props> = ({ category, language, user, onClose }) =>
 
   return (
     <div className="fixed inset-0 z-[100] bg-[#020408] flex flex-col items-center justify-between pt-safe pb-safe animate-fadeIn overflow-hidden text-white font-sans">
-      
-      {/* Background Visualizer (Neural Fog) */}
       <div className="absolute inset-0 opacity-40 pointer-events-none">
           <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150vw] h-[150vw] rounded-full blur-[120px] transition-all duration-1000 ${aiState === 'speaking' ? 'bg-indigo-600/30' : aiState === 'thinking' ? 'bg-amber-600/20' : 'bg-emerald-600/20'}`}
                style={{ transform: `translate(-50%, -50%) scale(${1 + userVolume * 2})` }}></div>
       </div>
 
-      {/* Top Clinical HUD */}
       <header className="w-full px-8 py-6 flex justify-between items-start z-20">
           <button onClick={onClose} className="p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all backdrop-blur-xl active:scale-90">
               <X size={24} />
@@ -122,10 +126,7 @@ const VoiceOverlay: React.FC<Props> = ({ category, language, user, onClose }) =>
           </div>
       </header>
 
-      {/* Main Interactive Core */}
       <main className="flex-1 w-full flex flex-col items-center justify-center relative">
-          
-          {/* Camera View (Floating Card) */}
           <div className={`absolute top-0 transition-all duration-700 overflow-hidden rounded-[2.5rem] border-2 border-white/10 shadow-2xl z-30 ${isVideoOn ? 'w-48 h-64 opacity-100 translate-y-0' : 'w-0 h-0 opacity-0 -translate-y-10'}`}>
               <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover grayscale contrast-125" />
               <canvas ref={canvasRef} className="hidden" />
@@ -136,25 +137,16 @@ const VoiceOverlay: React.FC<Props> = ({ category, language, user, onClose }) =>
               </div>
           </div>
 
-          {/* The Neural Orb */}
           <div className="relative group cursor-pointer" onClick={() => setIsVideoOn(!isVideoOn)}>
-              {/* Dynamic Aura */}
               <div className={`absolute inset-[-40px] rounded-full blur-3xl opacity-30 transition-all duration-1000 ${aiState === 'speaking' ? 'bg-indigo-500 animate-pulse' : 'bg-emerald-500'}`}></div>
-              
-              {/* Core Orb */}
               <div className={`w-56 h-56 rounded-full flex items-center justify-center relative z-10 border-4 border-white/10 shadow-2xl transition-all duration-500 overflow-hidden
                   ${aiState === 'speaking' ? 'scale-110' : aiState === 'thinking' ? 'scale-105' : 'scale-100'}
                   ${aiState === 'speaking' ? 'bg-indigo-900/40' : 'bg-emerald-900/40'}`}>
-                  
-                  {/* Internal Energy Swirl (CSS Animation) */}
                   <div className={`absolute inset-0 opacity-50 animate-spin-slow ${aiState === 'speaking' ? 'bg-[radial-gradient(circle_at_center,_#818cf8_0%,_transparent_70%)]' : 'bg-[radial-gradient(circle_at_center,_#34d399_0%,_transparent_70%)]'}`}></div>
-                  
                   {aiState === 'listening' ? <Mic size={64} className="text-emerald-400 animate-pulse" /> : 
                    aiState === 'thinking' ? <Zap size={64} className="text-amber-400 animate-bounce" /> : 
                    <Sparkles size={64} className="text-indigo-400 animate-pulse" />}
               </div>
-
-              {/* HUD Rings */}
               <div className="absolute inset-[-20px] border border-white/5 rounded-full animate-spin-slow"></div>
               <div className="absolute inset-[-10px] border border-white/10 rounded-full animate-reverse-spin"></div>
           </div>
@@ -163,32 +155,20 @@ const VoiceOverlay: React.FC<Props> = ({ category, language, user, onClose }) =>
               <h2 className="text-2xl font-black tracking-tight">{isVideoOn ? (isRTL ? 'بصيرة سكينة مفعلة' : 'Sakinnah Insight ON') : (isRTL ? 'سكينة تسمعك' : 'Sakinnah Listening')}</h2>
               <div className="h-20 max-w-sm flex items-center justify-center">
                   <p className="text-indigo-200/60 text-sm italic font-medium leading-relaxed animate-fadeIn line-clamp-3">
-                      {transcript || (isRTL ? "أنا معك بكل حواسي، تفضل بالحديث..." : "I'm with you with all my senses, please speak...")}
+                      {transcript || (isRTL ? "أنا معك بكل حواسي، تفضل بالحديث..." : "I'm here with you, please tell me what's on your mind...")}
                   </p>
               </div>
           </div>
       </main>
 
-      {/* Control Bar */}
       <footer className="w-full px-10 pb-16 flex items-center justify-between max-w-sm z-20">
-          <button 
-            onClick={() => setIsMuted(!isMuted)} 
-            className={`p-6 rounded-[2rem] transition-all border border-white/10 shadow-xl ${isMuted ? 'bg-red-500 text-white' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}
-          >
+          <button onClick={() => setIsMuted(!isMuted)} className={`p-6 rounded-[2rem] transition-all border border-white/10 shadow-xl ${isMuted ? 'bg-red-500 text-white' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}>
               <VolumeX size={24} />
           </button>
-
-          <button 
-            onClick={onClose}
-            className="p-8 rounded-[3rem] bg-red-600 text-white shadow-2xl shadow-red-900/40 hover:bg-red-500 transition-all active:scale-90 border-4 border-[#020408]"
-          >
+          <button onClick={onClose} className="p-8 rounded-[3rem] bg-red-600 text-white shadow-2xl shadow-red-900/40 hover:bg-red-500 transition-all active:scale-90 border-4 border-[#020408]">
               <Phone size={32} className="rotate-[135deg]" />
           </button>
-
-          <button 
-            onClick={() => setIsVideoOn(!isVideoOn)}
-            className={`p-6 rounded-[2rem] transition-all border border-white/10 shadow-xl ${isVideoOn ? 'bg-emerald-500 text-white animate-pulse' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}
-          >
+          <button onClick={() => setIsVideoOn(!isVideoOn)} className={`p-6 rounded-[2rem] transition-all border border-white/10 shadow-xl ${isVideoOn ? 'bg-emerald-500 text-white animate-pulse' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}>
               {isVideoOn ? <Video size={24} /> : <VideoOff size={24} />}
           </button>
       </footer>
@@ -199,8 +179,6 @@ const VoiceOverlay: React.FC<Props> = ({ category, language, user, onClose }) =>
           @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
           @keyframes reveal { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
           .animate-reveal { animation: reveal 0.4s ease-out forwards; }
-          .animate-pulse-ring { animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite; }
-          @keyframes pulse-ring { 0% { transform: scale(0.95); opacity: 0.5; } 100% { transform: scale(1.5); opacity: 0; } }
       `}</style>
     </div>
   );
