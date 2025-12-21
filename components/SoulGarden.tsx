@@ -153,9 +153,9 @@ const SoulGarden: React.FC<Props> = ({ onBack, language }) => {
               </p>
           </div>
 
-          {/* Slogan - Added here for poetic effect */}
+          {/* Slogan - Using elegant serif font */}
           <div className="mb-4 text-center px-6 animate-fadeIn" style={{animationDelay: '0.5s'}}>
-              <p className="text-lg md:text-xl font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-green-700 drop-shadow-sm leading-relaxed">
+              <p className="text-xl md:text-2xl font-serif italic text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-green-700 drop-shadow-sm leading-relaxed">
                   "{t.brandSlogan}"
               </p>
           </div>

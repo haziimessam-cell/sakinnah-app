@@ -44,7 +44,7 @@ const CategoryCard: React.FC<Props> = ({ category, onClick, onInfo, index, langu
           <div className={`w-14 h-14 bg-gradient-to-br ${getGradient()} rounded-2xl flex items-center justify-center mb-2 shadow-sm group-hover:scale-110 transition-transform duration-500 border`}>
             <IconComponent size={24} />
           </div>
-          <span className="text-[7px] font-black text-slate-400 text-center uppercase tracking-[0.2em] line-clamp-1 px-1">{title}</span>
+          <span className="text-[8px] font-black text-slate-400 text-center uppercase tracking-[0.2em] line-clamp-1 px-1">{title}</span>
         </div>
     );
   }
@@ -60,8 +60,8 @@ const CategoryCard: React.FC<Props> = ({ category, onClick, onInfo, index, langu
       </div>
       
       <div className="flex flex-col items-center gap-1">
-          <h3 className="text-slate-700 font-black text-xs text-center uppercase tracking-tight italic font-sans">{title}</h3>
-          <p className="text-[7px] font-bold text-slate-300 uppercase tracking-[0.3em] font-arabic">{category.id}</p>
+          <h3 className="text-slate-700 font-bold text-sm text-center tracking-tight font-sans">{title}</h3>
+          <p className="text-[7px] font-black text-slate-300 uppercase tracking-[0.3em] font-arabic">{category.id}</p>
       </div>
       
       <button 

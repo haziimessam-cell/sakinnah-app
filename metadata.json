@@ -1,7 +1,8 @@
 {
-  "name": "Copy of Sakinnah (سكينة)",
+  "name": "Sakinnah (سكينة)",
   "description": "تطبيق سكينة - رفيقك للصحة النفسية المدعوم بالذكاء الاصطناعي والمراجع العلمية.",
   "requestFramePermissions": [
-    "microphone"
+    "microphone",
+    "camera"
   ]
 }

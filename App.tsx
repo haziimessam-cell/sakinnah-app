@@ -101,6 +101,7 @@ const App: React.FC = () => {
       case 'ASSESSMENT': 
         return (
           <AssessmentWizard 
+            category={category!}
             questions={ASSESSMENT_QUESTIONS[category!.id] || []} 
             currentStep={assessmentStep} 
             onAnswer={handleAssessmentAnswer} 

@@ -1,5 +1,4 @@
-
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React, { ErrorInfo, ReactNode } from 'react';
 import { translations } from '../translations';
 import { RefreshCcw, AlertTriangle } from 'lucide-react';
 
@@ -15,37 +14,34 @@ interface State {
 /**
  * Robust ErrorBoundary to catch and display UI crashes gracefully.
  */
-// Fix: Explicitly extend React.Component to resolve TS compilation issues with inherited members
+// Explicitly extending React.Component with typed Props and State to resolve 'state' and 'props' type errors.
 export default class ErrorBoundary extends React.Component<Props, State> {
+  // Use property initializer for state to ensure it's correctly typed within the class
   public state: State = {
     hasError: false,
     error: null,
   };
 
-  constructor(props: Props) {
-    super(props);
-  }
-
-  // Update state so the next render will show the fallback UI.
+  // Mandatory static method for error boundaries to update state when a child component throws an error
   public static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
 
-  // Lifecycle method to catch errors and log diagnostic information
+  // Lifecycle method called after an error is caught for side effects like logging diagnostics
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log the error to the console for debugging
+    // Logging error details to the console for debugging purposes
     console.error("ErrorBoundary caught an error:", error, errorInfo);
   }
 
-  // Resets the error state and reloads the application.
+  // Resets the error state and reloads the page to attempt application recovery
   private handleReload = () => {
-    // setState is now correctly typed as a member of Component
+    // Resetting state using the inherited setState method from Component
     this.setState({ hasError: false, error: null });
     window.location.reload();
   };
 
   public render(): ReactNode {
-    // Access state via class instance
+    // Accessing this.state to check if the error boundary has caught a crash
     if (this.state.hasError) {
       const savedLang = localStorage.getItem('sakinnah_lang');
       const lang: 'ar' | 'en' = (savedLang === 'en' || savedLang === 'ar') ? (savedLang as 'ar' | 'en') : 'ar';
@@ -77,7 +73,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
       );
     }
 
-    // Access props from the correctly typed base class
+    // Returning children from this.props when no error condition is met
     return this.props.children;
   }
 }

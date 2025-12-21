@@ -1,11 +1,12 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { User, Category, Language, ViewStateName } from '../types';
 import { translations } from '../translations';
 import { CATEGORIES } from '../constants';
 import CategoryCard from './CategoryCard';
 import MoodTracker from './MoodTracker';
-import { Home, BookOpen, Sprout, User as UserIcon, Bell, Sparkles, Moon, Ghost, MessageSquareHeart, Anchor } from 'lucide-react';
+import NotificationCenter from './NotificationCenter';
+import { Home, BookOpen, Sprout, User as UserIcon, Bell, Sparkles, Moon, Ghost, MessageSquareHeart } from 'lucide-react';
 
 interface Props {
   user: User;
@@ -17,6 +18,7 @@ interface Props {
 const HomePage: React.FC<Props> = ({ user, language, onSelectCategory, onNavigate }) => {
   const t = translations[language] as any;
   const isRTL = language === 'ar';
+  const [showNotifs, setShowNotifs] = useState(false);
 
   const labs = [
     { id: 'DREAM', title: isRTL ? 'تحليل الأحلام' : 'Dream Analysis', icon: <Moon size={22} />, color: 'bg-indigo-600', desc: isRTL ? 'فك رموز اللاوعي' : 'Decipher subconscious' },
@@ -38,10 +40,23 @@ const HomePage: React.FC<Props> = ({ user, language, onSelectCategory, onNavigat
             <h2 className="text-sm font-black text-slate-800">{user.name}</h2>
           </div>
         </div>
-        <button className="p-2.5 bg-white rounded-xl shadow-sm border border-slate-100 text-slate-400">
+        <button 
+          onClick={() => setShowNotifs(true)} 
+          className="p-2.5 bg-white rounded-xl shadow-sm border border-slate-100 text-slate-400 relative active:scale-95 transition-all"
+        >
             <Bell size={18} />
+            <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
         </button>
       </header>
+
+      {/* Notification Center Overlay */}
+      {showNotifs && (
+          <NotificationCenter 
+            language={language} 
+            onClose={() => setShowNotifs(false)} 
+            onNavigate={onNavigate} 
+          />
+      )}
 
       <main className="flex-1 overflow-y-auto no-scrollbar pb-32 p-6 space-y-8">
         {/* Mood Tracker */}

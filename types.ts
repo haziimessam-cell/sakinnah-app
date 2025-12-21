@@ -12,6 +12,18 @@ export interface Message {
   isBookmarked?: boolean;
 }
 
+export interface AppNotification {
+  id: string;
+  type: 'insight' | 'reminder' | 'garden' | 'alert';
+  titleAr: string;
+  titleEn: string;
+  bodyAr: string;
+  bodyEn: string;
+  timestamp: Date;
+  isRead: boolean;
+  actionView?: ViewStateName;
+}
+
 export interface CognitiveNode {
     id: string;
     label: string;
@@ -35,7 +47,7 @@ export interface SandboxScenario {
 }
 
 export interface ViewState {
-    type: 'LOGIN' | 'HOME' | 'CHAT' | 'DISCLAIMER' | 'PROFILE' | 'SETTINGS' | 'HELP' | 'BREATHING' | 'GARDEN' | 'DREAM' | 'GROUNDING' | 'BOOKING' | 'SLEEP_TOOL' | 'SUBSCRIPTION' | 'JOURNAL' | 'EMERGENCY_CHAT' | 'FADFADA' | 'ASSESSMENT' | 'PLAN' | 'CBT_CANVAS' | 'SOCIAL_SANDBOX' | 'RELATIONSHIP_HUB' | 'EMPATHY_TRANSLATOR' | 'ATTACHMENT_MAPPER' | 'CO_REGULATOR' | 'MEDIATOR' | 'SLEEP_SANCTUARY';
+    type: 'LOGIN' | 'HOME' | 'CHAT' | 'DISCLAIMER' | 'PROFILE' | 'SETTINGS' | 'HELP' | 'BREATHING' | 'GARDEN' | 'DREAM' | 'GROUNDING' | 'BOOKING' | 'SLEEP_TOOL' | 'SUBSCRIPTION' | 'JOURNAL' | 'EMERGENCY_CHAT' | 'FADFADA' | 'ASSESSMENT' | 'PLAN' | 'CBT_CANVAS' | 'SOCIAL_SANDBOX' | 'RELATIONSHIP_HUB' | 'EMPATHY_TRANSLATOR' | 'ATTACHMENT_MAPPER' | 'CO_REGULATOR' | 'MEDIATOR' | 'SLEEP_SANCTUARY' | 'NOTIFICATIONS';
 }
 
 export interface User {
