@@ -4,8 +4,7 @@ import { User, Language, ViewStateName } from '../types';
 import { translations } from '../translations';
 import { 
   Zap, ShieldAlert, CloudRain, Activity, Sprout, HeartHandshake, 
-  ChevronLeft, ChevronRight, User as UserIcon, HeartPulse, Sparkles, Moon, MessageSquare,
-  ArrowUpRight, Star, Settings, Bell
+  ChevronRight, Bell, Search, Calendar, Sparkles, Moon
 } from 'lucide-react';
 
 interface Props {
@@ -20,144 +19,109 @@ const HomePage: React.FC<Props> = ({ user, language, onSelectCategory, onNavigat
   const isRTL = language === 'ar';
 
   const clinics = [
-    { id: 'stress', title: t.stressWing, desc: t.stressDesc, icon: <Zap size={22} />, color: "from-orange-400 to-amber-500" },
-    { id: 'anxiety', title: t.anxietyWing, desc: t.anxietyDesc, icon: <ShieldAlert size={22} />, color: "from-sky-400 to-indigo-500" },
-    { id: 'depression', title: t.depressionWing, desc: t.depressionDesc, icon: <CloudRain size={22} />, color: "from-blue-500 to-slate-700" },
-    { id: 'bipolar', title: t.bipolarWing, desc: t.bipolarDesc, icon: <Activity size={22} />, color: "from-purple-500 to-pink-600" },
-    { id: 'sprouts', title: t.sproutsWing, desc: t.sproutsDesc, icon: <Sprout size={22} />, color: "from-emerald-400 to-teal-600" },
-    { id: 'relationships', title: t.relWing, desc: t.relDesc, icon: <HeartHandshake size={22} />, color: "from-rose-400 to-pink-500" }
+    { id: 'stress', title: t.stressWing, desc: t.stressDesc, icon: <Zap size={22} />, color: "bg-ios-azure" },
+    { id: 'anxiety', title: t.anxietyWing, desc: t.anxietyDesc, icon: <ShieldAlert size={22} />, color: "bg-ios-azure" },
+    { id: 'depression', title: t.depressionWing, desc: t.depressionDesc, icon: <CloudRain size={22} />, color: "bg-ios-azure" },
+    { id: 'bipolar', title: t.bipolarWing, desc: t.bipolarDesc, icon: <Activity size={22} />, color: "bg-ios-azure" },
+    { id: 'sprouts', title: t.sproutsWing, desc: t.sproutsDesc, icon: <Sprout size={22} />, color: "bg-ios-emerald" },
+    { id: 'relationships', title: t.relWing, desc: t.relDesc, icon: <HeartHandshake size={22} />, color: "bg-ios-emerald" }
   ];
 
-  const getTimeGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return isRTL ? "صباح السكينة" : "Morning Serenity";
-    if (hour < 18) return isRTL ? "يومك مبارك" : "A Blessed Day";
-    return isRTL ? "مساء الهدوء" : "Evening Peace";
-  };
-
   return (
-    <div className="h-full flex flex-col pt-safe pb-safe overflow-hidden font-sans select-none">
-      {/* Upper Navigation - Global Standard */}
-      <header className="px-8 py-6 flex items-center justify-between z-30">
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <div className="w-14 h-14 rounded-[1.4rem] bg-sakinnah-navy flex items-center justify-center text-sakinnah-slate font-black text-xl shadow-2xl">
-              {user.name[0]}
+    <div className="h-full bg-white flex flex-col pt-safe pb-safe overflow-hidden">
+      {/* Header - iOS Style Large Title */}
+      <header className="px-6 pt-10 pb-6 flex flex-col gap-1 bg-white sticky top-0 z-30">
+        <div className="flex items-center justify-between mb-2">
+            <span className="text-[13px] font-bold text-ios-azure uppercase tracking-wider">
+                {new Date().toLocaleDateString(isRTL ? 'ar-EG' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </span>
+            <div className="flex items-center gap-4">
+                <button onClick={() => onNavigate('NOTIFICATIONS')} className="text-ios-azure p-2 bg-ios-azure/5 rounded-full"><Bell size={24} /></button>
+                <button onClick={() => onNavigate('PROFILE')} className="w-10 h-10 bg-ios-azure rounded-full border-2 border-white flex items-center justify-center font-bold text-white shadow-lg shadow-ios-azure/20">{user.name[0]}</button>
             </div>
-            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-sakinnah-emerald rounded-full border-4 border-sakinnah-slate"></div>
-          </div>
-          <div>
-            <p className="text-[10px] font-black text-sakinnah-navy/30 uppercase tracking-[0.2em]">{getTimeGreeting()}</p>
-            <h2 className="text-xl font-black text-sakinnah-navy leading-none tracking-tight">{user.name}</h2>
-          </div>
         </div>
-        <div className="flex items-center gap-3">
-            <button onClick={() => onNavigate('NOTIFICATIONS')} className="p-3 bg-white rounded-2xl shadow-sm border border-slate-100 text-slate-400 hover:text-indigo-600 transition-all">
-                <Bell size={20} />
-            </button>
-            <button onClick={() => onNavigate('PROFILE')} className="p-3 bg-white rounded-2xl shadow-sm border border-slate-100 text-slate-400 hover:text-sakinnah-navy transition-all">
-                <Settings size={20} />
-            </button>
-        </div>
+        <h1 className="large-title animate-ios-reveal">
+            {isRTL ? 'مرحباً، ' : 'Hello, '}{user.name}
+        </h1>
       </header>
 
-      <main className="flex-1 overflow-y-auto no-scrollbar px-6 space-y-10 pb-32 pt-2">
-        {/* The Sanctuary - Immersive Card */}
-        <section className="animate-reveal">
+      <main className="flex-1 overflow-y-auto no-scrollbar px-6 space-y-8 pb-32">
+        {/* iOS Pure White Search Bar */}
+        <div className="relative group animate-ios-reveal" style={{ animationDelay: '100ms' }}>
+            <Search className="absolute left-4 top-3.5 text-ios-azure/40" size={20} />
+            <input 
+                type="text" 
+                placeholder={isRTL ? 'ابحث عن الطمأنينة...' : 'Search for peace...'} 
+                className="w-full bg-ios-slate h-12 rounded-2xl pl-12 pr-4 text-[17px] outline-none transition-all focus:bg-white border-2 border-transparent focus:border-ios-azure/10 text-ios-azureDeep"
+            />
+        </div>
+
+        {/* Featured Card - The Sanctuary */}
+        <section className="animate-ios-reveal" style={{ animationDelay: '200ms' }}>
             <div 
               onClick={() => onNavigate('WELLNESS_SANCTUARY')}
-              className="group relative h-72 bg-sakinnah-navy rounded-[3rem] p-10 text-white overflow-hidden shadow-2xl transition-transform active:scale-[0.97] cursor-pointer"
+              className="ios-card p-8 flex flex-col justify-between h-56 relative overflow-hidden bg-gradient-to-br from-ios-azure to-ios-azureDeep"
             >
-                {/* Visual Elements */}
-                <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-br from-indigo-500/20 to-sakinnah-azure/10"></div>
-                <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-sakinnah-azure/10 rounded-full blur-[100px] group-hover:scale-110 transition-transform duration-[4000ms]"></div>
-                <div className="absolute top-10 right-10 text-white/5 group-hover:rotate-12 transition-transform duration-[3000ms]">
-                    <Sparkles size={200} strokeWidth={0.5} />
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
+                <div className="relative z-10">
+                    <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white mb-6"><Sparkles size={24} /></div>
+                    <h3 className="text-2xl font-bold text-white mb-1 leading-tight">{t.wellnessSanctuary}</h3>
+                    <p className="text-[15px] text-white/80 font-medium leading-relaxed">{t.wellnessSanctuaryDesc}</p>
                 </div>
-
-                <div className="relative z-10 h-full flex flex-col justify-between">
-                    <div>
-                        <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 mb-6">
-                            <Sparkles size={14} className="text-sakinnah-azure animate-pulse" />
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">{t.wellnessSanctuary}</span>
-                        </div>
-                        <h3 className="text-4xl font-black leading-none tracking-tighter italic max-w-[280px]">
-                            {t.wellnessSanctuaryDesc}
-                        </h3>
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <div className="flex -space-x-3">
-                            <div className="w-11 h-11 rounded-full bg-sakinnah-gold border-2 border-sakinnah-navy flex items-center justify-center shadow-lg"><MessageSquare size={18} /></div>
-                            <div className="w-11 h-11 rounded-full bg-sakinnah-azure border-2 border-sakinnah-navy flex items-center justify-center shadow-lg"><Moon size={18} /></div>
-                            <div className="w-11 h-11 rounded-full bg-sakinnah-emerald border-2 border-sakinnah-navy flex items-center justify-center shadow-lg"><Star size={18} /></div>
-                        </div>
-                        <div className="flex items-center gap-2 font-black text-xs text-sakinnah-azure uppercase tracking-widest">
-                            {isRTL ? 'استكشف الملاذ' : 'EXPLORE'}
-                            <ArrowUpRight size={18} />
-                        </div>
+                <div className="relative z-10 flex justify-end">
+                    <div className="bg-white text-ios-azure px-5 py-2 rounded-full text-sm font-bold shadow-sm">
+                        {isRTL ? 'استكشف' : 'Explore'}
                     </div>
                 </div>
             </div>
         </section>
 
-        {/* Specialized Clinics Grid */}
-        <section className="space-y-6 animate-reveal" style={{ animationDelay: '200ms' }}>
-            <div className="flex items-center justify-between px-2">
-                <h3 className="text-[11px] font-black text-sakinnah-navy/40 uppercase tracking-[0.4em] flex items-center gap-3">
-                    <HeartPulse size={16} className="text-sakinnah-azure" />
-                    {isRTL ? 'العيادات التخصصية' : 'SPECIALIZED CLINICS'}
-                </h3>
-            </div>
-            
+        {/* Specialized Clinics List */}
+        <section className="space-y-5 animate-ios-reveal" style={{ animationDelay: '300ms' }}>
+            <h2 className="text-[22px] font-bold text-ios-azureDeep px-1">{isRTL ? 'العيادات المتخصصة' : 'Specialized Clinics'}</h2>
             <div className="grid grid-cols-1 gap-4">
                 {clinics.map((clinic, idx) => (
                     <button 
                         key={clinic.id} 
                         onClick={() => onSelectCategory(clinic.id)}
-                        style={{ animationDelay: `${300 + idx * 100}ms` }}
-                        className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6 group active:scale-[0.98] transition-all text-start hover:border-sakinnah-azure/20 hover:shadow-xl hover:shadow-slate-200/50 animate-reveal"
+                        className="ios-card p-5 flex items-center gap-5"
                     >
-                        <div className={`w-16 h-16 bg-gradient-to-br ${clinic.color} rounded-[1.8rem] flex items-center justify-center text-white shadow-xl group-hover:scale-110 group-hover:rotate-2 transition-all duration-500`}>
+                        <div className={`w-14 h-14 ${clinic.color} rounded-2xl flex items-center justify-center text-white shadow-lg shadow-ios-azure/10`}>
                             {clinic.icon}
                         </div>
-                        <div className="flex-1">
-                            <h4 className="text-xl font-black text-sakinnah-navy tracking-tight">{clinic.title}</h4>
-                            <p className="text-[10px] font-bold text-sakinnah-navy/40 uppercase leading-relaxed tracking-wider">{clinic.desc}</p>
+                        <div className="flex-1 text-start">
+                            <h4 className="text-[18px] font-bold text-ios-azureDeep leading-tight">{clinic.title}</h4>
+                            <p className="text-[13px] text-ios-azure/60 font-semibold">{clinic.desc}</p>
                         </div>
-                        <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-200 group-hover:bg-sakinnah-azure group-hover:text-white transition-all">
-                            {isRTL ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+                        <div className="w-8 h-8 rounded-full bg-ios-slate flex items-center justify-center text-ios-azure">
+                            <ChevronRight size={18} className={isRTL ? 'rotate-180' : ''} />
                         </div>
                     </button>
                 ))}
             </div>
         </section>
 
-        {/* Daily Insight Placeholder */}
-        <section className="pb-20 animate-reveal" style={{ animationDelay: '1s' }}>
-            <div className="bg-sakinnah-emerald/5 border border-sakinnah-emerald/10 rounded-[2.5rem] p-8 flex items-start gap-6">
-                <div className="w-12 h-12 bg-sakinnah-emerald/10 rounded-2xl flex items-center justify-center text-sakinnah-emerald">
-                    <Activity size={24} />
-                </div>
-                <div>
-                    <h5 className="text-[10px] font-black text-sakinnah-emerald uppercase tracking-[0.2em] mb-2">{isRTL ? 'بصيرة اليوم' : 'DAILY INSIGHT'}</h5>
-                    <p className="text-sm font-bold text-sakinnah-navy/70 leading-relaxed italic">
-                        {isRTL ? '"السكينة لا تعني غياب العواصف، بل الهدوء الذي تجده في مركزها."' : '"Serenity is not the absence of storm, but the peace you find at its center."'}
-                    </p>
-                </div>
-            </div>
-        </section>
+        {/* Motivational Footnote */}
+        <footer className="py-12 text-center animate-ios-reveal" style={{ animationDelay: '400ms' }}>
+             <p className="text-[14px] font-semibold text-ios-azure/40 italic px-12 leading-relaxed">
+                {isRTL ? '"السكينة هي لغة الروح حين تتوقف عن القتال."' : '"Serenity is the soul\'s language when it stops fighting."'}
+             </p>
+        </footer>
       </main>
 
-      {/* Modern Bottom Navigation */}
-      <nav className="fixed bottom-8 left-8 right-8 h-22 glass-premium rounded-[2.8rem] px-10 flex justify-between items-center z-50 shadow-2xl shadow-indigo-500/10 border border-white/50">
-          <button onClick={() => onNavigate('HOME')} className="flex flex-col items-center gap-1 group">
-              <div className="p-3 bg-sakinnah-navy rounded-2xl text-white shadow-lg"><Activity size={24} /></div>
+      {/* Tab Bar - iOS Style with Blur */}
+      <nav className="ios-blur fixed bottom-0 left-0 right-0 h-24 border-t border-ios-azure/5 flex justify-around items-center z-50 safe-pb px-6">
+          <button onClick={() => onNavigate('HOME')} className="flex flex-col items-center gap-1.5 text-ios-azure">
+              <Activity size={26} strokeWidth={2.5} />
+              <span className="text-[11px] font-bold">{t.home}</span>
           </button>
-          <button onClick={() => onNavigate('BREATHING')} className="flex flex-col items-center gap-1 group text-slate-300 hover:text-sakinnah-azure transition-colors">
+          <button onClick={() => onNavigate('BREATHING')} className="flex flex-col items-center gap-1.5 text-ios-azure/30">
               <Sparkles size={26} />
+              <span className="text-[11px] font-bold">{isRTL ? 'تنفس' : 'Breathe'}</span>
           </button>
-          <button onClick={() => onNavigate('PROFILE')} className="flex flex-col items-center gap-1 group text-slate-300 hover:text-sakinnah-navy transition-colors">
-              <UserIcon size={26} />
+          <button onClick={() => onNavigate('PROFILE')} className="flex flex-col items-center gap-1.5 text-ios-azure/30">
+              <Moon size={26} />
+              <span className="text-[11px] font-bold">{t.profile}</span>
           </button>
       </nav>
     </div>

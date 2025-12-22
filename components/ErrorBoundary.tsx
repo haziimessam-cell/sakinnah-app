@@ -15,35 +15,36 @@ interface State {
 /**
  * Robust ErrorBoundary to catch and display UI crashes gracefully.
  */
-// Fix: Use React.Component to ensure proper inheritance and access to state/props/setState
-export default class ErrorBoundary extends React.Component<Props, State> {
+// Fix: Inherit directly from Component and declare state as a class property to resolve TypeScript member access errors and correctly inherit from React's base component.
+export default class ErrorBoundary extends Component<Props, State> {
+  // Explicitly declare state as a class property to ensure it is typed correctly for this instance
+  public state: State = {
+    hasError: false,
+    error: null,
+  };
+
   constructor(props: Props) {
     super(props);
-    // Fix: Initialize state property from React.Component
-    this.state = {
-      hasError: false,
-      error: null,
-    };
   }
 
-  // Static method to catch error and update state
+  // Static method to catch error and update state.
   public static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
 
-  // Lifecycle method for side effects like logging
+  // Lifecycle method for side effects like logging.
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("ErrorBoundary caught an error:", error, errorInfo);
   }
 
-  // Fix: Use this.setState inherited from React.Component
+  // Correctly accessing setState from the inherited Component class.
   private handleReload = () => {
     this.setState({ hasError: false, error: null });
     window.location.reload();
   };
 
   public render(): ReactNode {
-    // Fix: Access state property inherited from React.Component
+    // Accessing state property inherited from React Component base class.
     if (this.state.hasError) {
       const savedLang = localStorage.getItem('sakinnah_lang');
       const lang: 'ar' | 'en' = (savedLang === 'en' || savedLang === 'ar') ? (savedLang as 'ar' | 'en') : 'ar';
@@ -75,7 +76,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
       );
     }
 
-    // Fix: Access props property inherited from React.Component
+    // Accessing props property inherited from React Component base class.
     return this.props.children;
   }
 }

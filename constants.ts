@@ -54,10 +54,16 @@ export const GRANDMA_STORY_PROMPT_AR = `أنت "الحكواتية"، جدة ح�
 export const GRANDMA_STORY_PROMPT_EN = `You are "The Storyteller", a wise grandmother telling soothing bedtime stories. Tell a calm, magical fairy tale. Use poetic and relaxing language that aids deep relaxation.`;
 
 export const STORY_ELEMENTS_AR = {
-    heroes: ["النجمة الصغيرة التائهة", "السحابة الفضية الصبورة", "الغابة الهادئة الحالمة", "النهر السحري الصافي"]
+    heroes: ["النجمة الصغيرة التائهة", "السحابة الفضية الصبورة", "الغابة الهادئة الحالمة", "النهر السحري الصافي"],
+    settings: ["في أعماق البحار الزرقاء", "فوق قمة جبل الثلج", "في واحة خضراء وسط الصحراء", "بين غيوم السماء الملونة"],
+    themes: ["الصبر والمثابرة", "قوة الصداقة", "حب الاستكشاف", "قيمة الهدوء"],
+    objects: ["مفتاح ذهبي قديم", "ريشة سحرية طائرة", "كتاب الأسرار المفقود", "بلورة الضياء"]
 };
 export const STORY_ELEMENTS_EN = {
-    heroes: ["The Little Lost Star", "The Patient Silver Cloud", "The Dreamy Quiet Forest", "The Clear Magic River"]
+    heroes: ["The Little Lost Star", "The Patient Silver Cloud", "The Dreamy Quiet Forest", "The Clear Magic River"],
+    settings: ["In the deep blue sea", "Atop the snowy mountain", "In a green oasis in the desert", "Among the colorful sky clouds"],
+    themes: ["Patience and perseverance", "The power of friendship", "The love of exploration", "The value of calmness"],
+    objects: ["An old golden key", "A magical flying feather", "The lost book of secrets", "A crystal of light"]
 };
 
 export const MEMORY_EXTRACTION_PROMPT = `Extract key psychological insights, memories, and emotional triggers from this interaction. Identify recurring themes and core beliefs. Return as a JSON array of objects.`;
