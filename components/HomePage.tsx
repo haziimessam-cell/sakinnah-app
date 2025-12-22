@@ -4,7 +4,7 @@ import { User, Language, ViewStateName } from '../types';
 import { translations } from '../translations';
 import { 
   Zap, ShieldAlert, CloudRain, Activity, Sprout, HeartHandshake, 
-  ChevronRight, Bell, Search, Calendar, Sparkles, Moon
+  ChevronRight, Bell, Search, Calendar, Sparkles, Moon, BrainCircuit
 } from 'lucide-react';
 
 interface Props {
@@ -22,6 +22,7 @@ const HomePage: React.FC<Props> = ({ user, language, onSelectCategory, onNavigat
     { id: 'stress', title: t.stressWing, desc: t.stressDesc, icon: <Zap size={22} />, color: "bg-ios-azure" },
     { id: 'anxiety', title: t.anxietyWing, desc: t.anxietyDesc, icon: <ShieldAlert size={22} />, color: "bg-ios-azure" },
     { id: 'depression', title: t.depressionWing, desc: t.depressionDesc, icon: <CloudRain size={22} />, color: "bg-ios-azure" },
+    { id: 'ocd', title: t.ocdWing, desc: t.ocdDesc, icon: <BrainCircuit size={22} />, color: "bg-ios-azure" },
     { id: 'bipolar', title: t.bipolarWing, desc: t.bipolarDesc, icon: <Activity size={22} />, color: "bg-ios-azure" },
     { id: 'sprouts', title: t.sproutsWing, desc: t.sproutsDesc, icon: <Sprout size={22} />, color: "bg-ios-emerald" },
     { id: 'relationships', title: t.relWing, desc: t.relDesc, icon: <HeartHandshake size={22} />, color: "bg-ios-emerald" }

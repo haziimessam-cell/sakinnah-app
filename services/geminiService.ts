@@ -2,15 +2,12 @@
 import { GoogleGenAI, Chat, GenerateContentResponse, Modality } from "@google/genai";
 import { SYSTEM_INSTRUCTION_AR, SYSTEM_INSTRUCTION_EN } from "../constants";
 import { Language } from "../types";
+import { ragService } from "./ragService";
 
-// Always initialize with apiKey in a named parameter
 export const getAIInstance = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 let chatInstance: Chat | null = null;
 
-/**
- * Initializes a chat session with a specific system instruction and optional history.
- */
 export const initializeChat = async (historyId: string, systemInstruction: string, history: any[] = [], language: Language) => {
     const ai = getAIInstance();
     chatInstance = ai.chats.create({ 
@@ -19,72 +16,62 @@ export const initializeChat = async (historyId: string, systemInstruction: strin
     });
 };
 
-/**
- * Generates text content for one-off tasks like sentiment analysis, rephrasing, or rationale generation.
- */
 export const generateContent = async (prompt: string, systemInstruction?: string): Promise<string> => {
     const ai = getAIInstance();
     const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-3-pro-preview',
         contents: prompt,
         config: systemInstruction ? { systemInstruction } : undefined
     });
     return response.text || "";
 };
 
-/**
- * Generates embeddings for text to support psychological context retrieval and pattern matching.
- */
+// Fixed: Added missing mediator functions for RelationshipMediator component
+export const initializeMediator = async (language: Language) => {
+    const ai = getAIInstance();
+    chatInstance = ai.chats.create({ 
+        model: 'gemini-3-pro-preview',
+        config: { systemInstruction: language === 'ar' ? SYSTEM_INSTRUCTION_AR : SYSTEM_INSTRUCTION_EN }
+    });
+};
+
+export const mediateDialogue = async (partnerA: string, partnerB: string, language: Language): Promise<string> => {
+    const prompt = `Act as an expert AI Relationship Mediator. 
+    Partner A says: "${partnerA}"
+    Partner B says: "${partnerB}"
+    Based on Gottman principles and Non-Violent Communication (NVC), analyze the interaction, identify underlying needs, and suggest a compassionate path forward in ${language === 'ar' ? 'Arabic' : 'English'}.`;
+    
+    return generateContent(prompt, language === 'ar' ? SYSTEM_INSTRUCTION_AR : SYSTEM_INSTRUCTION_EN);
+};
+
 export const getEmbedding = async (text: string): Promise<number[] | null> => {
     try {
         const ai = getAIInstance();
-        // Use type casting to ensure access to embedContent if standard types are restrictive
         const result = await (ai.models as any).embedContent({
             model: 'text-embedding-004',
             content: { parts: [{ text }] }
         });
         return result.embedding.values;
     } catch (e) {
-        console.error("Embedding generation failed:", e);
         return null;
     }
 };
 
-/**
- * Generates a clinical rationale for a therapy plan based on assessment answers.
- */
 export const generateClinicalRationale = async (category: string, answers: string[], language: Language): Promise<string> => {
-    const prompt = `Analyze these assessment answers for the ${category} wing and provide a clinical rationale in ${language === 'ar' ? 'Arabic' : 'English'}: ${answers.join(', ')}`;
-    return generateContent(prompt);
+    const prompt = `Based on these clinical assessments for the [${category}] wing, provide a professional psychiatric formulation in ${language === 'ar' ? 'Arabic' : 'English'}: ${answers.join(', ')}`;
+    const system = language === 'ar' ? "أنت استشاري طب نفسي، قدم صياغة حالة إكلينيكية دقيقة." : "You are a consultant psychiatrist, provide a precise clinical case formulation.";
+    return generateContent(prompt, system);
 };
 
-/**
- * Initializes the relationship mediator state.
- */
-export const initializeMediator = (language: Language) => {
-    // Placeholder for mediator initialization if specific state management is needed
-};
-
-/**
- * Mediate a dialogue between two partners using Gottman principles and empathy-focused reasoning.
- */
-export const mediateDialogue = async (partnerA: string, partnerB: string, language: Language): Promise<string> => {
-    const prompt = `Mediate this dialogue between Partner A and Partner B in ${language === 'ar' ? 'Arabic' : 'English'}.\nPartner A: ${partnerA}\nPartner B: ${partnerB}`;
-    const sys = language === 'ar' ? 
-        "أنت وسيط خبير في العلاقات. استخدم مبادئ غوتمان لمساعدة الطرفين على التواصل بشكل صحي." : 
-        "You are an expert relationship mediator. Use Gottman principles to help partners communicate healthily.";
-    return generateContent(prompt, sys);
-};
-
-/**
- * دالة تجعل الذكاء الاصطناعي يبدأ الحوار فوراً بناءً على القسم
- */
 export const getInitialAISalutation = async (category: string, language: Language, context?: string): Promise<string> => {
   const ai = getAIInstance();
   const sys = language === 'ar' ? SYSTEM_INSTRUCTION_AR : SYSTEM_INSTRUCTION_EN;
-  const prompt = `You are Sakinnah, a human-like digital psychiatrist. Start a session for the [${category}] wing. 
-    Context about user: ${context || 'First time session'}. 
-    Provide a warm, proactive greeting that invites the user to speak. Do not wait for them. Speak as a human.`;
+  const scientificContext = ragService.retrieveContext(category, language);
+  
+  const prompt = `Start a session for the [${category}] wing. 
+    Context: ${context || 'First time'}. 
+    Evidence-based guidance: ${scientificContext}.
+    Provide a warm, professional, and proactive greeting. No AI mentions.`;
   
   try {
     const response = await ai.models.generateContent({
@@ -94,7 +81,7 @@ export const getInitialAISalutation = async (category: string, language: Languag
     });
     return response.text || "";
   } catch (e) {
-    return language === 'ar' ? "أهلاً بك، أنا سكينة. كيف يمكنني دعمك اليوم؟" : "Welcome, I am Sakinnah. How can I support you today?";
+    return language === 'ar' ? "أهلاً بك، أنا د. سكينة. أنا هنا لأستمع إليك، كيف حالك اليوم؟" : "Welcome, I am Dr. Sakinnah. I am here for you, how are you feeling today?";
   }
 };
 
@@ -106,16 +93,18 @@ export async function* sendMessageStreamToGemini(prompt: string, language: Langu
         config: { systemInstruction: language === 'ar' ? SYSTEM_INSTRUCTION_AR : SYSTEM_INSTRUCTION_EN }
     });
   }
-  const stream = await chatInstance.sendMessageStream({ message: prompt });
+
+  // Inject RAG context into the stream request for scientific accuracy
+  const clinicalContext = ragService.retrieveContext(prompt, language);
+  const enrichedPrompt = clinicalContext ? `[CLINICAL_GUIDANCE]: ${clinicalContext}\n\n[PATIENT_INPUT]: ${prompt}` : prompt;
+
+  const stream = await chatInstance.sendMessageStream({ message: enrichedPrompt });
   for await (const chunk of stream) {
     const c = chunk as GenerateContentResponse;
     yield c.text || "";
   }
 }
 
-/**
- * Generates speech from text using gemini-2.5-flash-preview-tts and returns an AudioBuffer.
- */
 export const generateSpeech = async (text: string, voiceName: string = 'Kore'): Promise<{ audioBuffer: AudioBuffer } | null> => {
     try {
         const ai = getAIInstance();
@@ -174,7 +163,6 @@ export const generateSpeech = async (text: string, voiceName: string = 'Kore'): 
 
         return { audioBuffer };
     } catch (e) {
-        console.error("Speech generation failed:", e);
         return null;
     }
 };

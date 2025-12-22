@@ -1,5 +1,5 @@
 
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React, { ErrorInfo, ReactNode } from 'react';
 import { translations } from '../translations';
 import { RefreshCcw, AlertTriangle } from 'lucide-react';
 
@@ -15,36 +15,36 @@ interface State {
 /**
  * Robust ErrorBoundary to catch and display UI crashes gracefully.
  */
-// Fix: Inherit directly from Component and declare state as a class property to resolve TypeScript member access errors and correctly inherit from React's base component.
-export default class ErrorBoundary extends Component<Props, State> {
-  // Explicitly declare state as a class property to ensure it is typed correctly for this instance
-  public state: State = {
-    hasError: false,
-    error: null,
-  };
-
+// Fix: Explicitly extending React.Component<Props, State> ensures that TypeScript correctly identifies inherited properties like state, setState, and props.
+export default class ErrorBoundary extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
+    // Fix: Initializing state within the constructor is the standard pattern for React class components to ensure state is defined.
+    this.state = {
+      hasError: false,
+      error: null,
+    };
   }
 
-  // Static method to catch error and update state.
+  // Static method to catch error and update state for rendering.
   public static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
 
-  // Lifecycle method for side effects like logging.
+  // Lifecycle method for side effects like error logging.
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("ErrorBoundary caught an error:", error, errorInfo);
   }
 
-  // Correctly accessing setState from the inherited Component class.
+  // Handle reload by resetting state and refreshing the page context.
   private handleReload = () => {
+    // Fix: Using this.setState, which is correctly identified as a member of the React.Component base class.
     this.setState({ hasError: false, error: null });
     window.location.reload();
   };
 
   public render(): ReactNode {
-    // Accessing state property inherited from React Component base class.
+    // Fix: this.state.hasError is now correctly resolved due to proper generic extension.
     if (this.state.hasError) {
       const savedLang = localStorage.getItem('sakinnah_lang');
       const lang: 'ar' | 'en' = (savedLang === 'en' || savedLang === 'ar') ? (savedLang as 'ar' | 'en') : 'ar';
@@ -59,8 +59,10 @@ export default class ErrorBoundary extends Component<Props, State> {
           <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-xs mx-auto leading-relaxed">
             {t.errorDesc || 'An unexpected error occurred.'}
             <br />
+            {/* Fix: Safely check for the error object in state before attempting to render its properties. */}
             {this.state.error && (
                <span className="text-xs opacity-70 mt-2 block font-mono bg-gray-200 dark:bg-slate-800 p-2 rounded max-w-full overflow-hidden text-ellipsis">
+                 {/* Fix: Accessing error.message from the state, now correctly typed. */}
                  {this.state.error.message}
                </span>
             )}
@@ -76,7 +78,7 @@ export default class ErrorBoundary extends Component<Props, State> {
       );
     }
 
-    // Accessing props property inherited from React Component base class.
+    // Fix: this.props.children is now correctly identified via React.Component<Props, State>.
     return this.props.children;
   }
 }
