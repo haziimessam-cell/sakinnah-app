@@ -1,13 +1,9 @@
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Language, User, JournalEntry } from '../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { Language, User, Role } from '../types';
 import { translations } from '../translations';
-import { DREAM_SYSTEM_INSTRUCTION_AR, DREAM_SYSTEM_INSTRUCTION_EN } from '../constants';
-import { sendMessageStreamToGemini, initializeChat } from '../services/geminiService';
-import { syncService } from '../services/syncService';
-import { liveVoiceService } from '../services/liveVoiceService';
-// Added Loader2 to imports from lucide-react
-import { ArrowRight, ArrowLeft, Moon, Stars, Send, Mic, MicOff, Key, HeartPulse, Lightbulb, Brain, Save, CheckCircle, Sparkles, Wand2, X, Volume2, MessageSquareText, Phone, Loader2 } from 'lucide-react';
+import { sendMessageStreamToGemini, initializeChat, getInitialAISalutation } from '../services/geminiService';
+import { ArrowRight, ArrowLeft, Moon, Stars, Send, Sparkles, Key, KeyRound, Brain, History } from 'lucide-react';
 
 interface Props {
   onBack: () => void;
@@ -15,220 +11,115 @@ interface Props {
   user: User;
 }
 
-type Mode = 'selection' | 'text' | 'voice';
-
 const DreamAnalyzer: React.FC<Props> = ({ onBack, language, user }) => {
   const t = translations[language] as any;
   const isRTL = language === 'ar';
-  
-  const [activeMode, setActiveMode] = useState<Mode>('selection');
-  const [inputText, setInputText] = useState('');
-  const [emotions, setEmotions] = useState('');
+  const [input, setInput] = useState('');
   const [analysis, setAnalysis] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isListeningText, setIsListeningText] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
-  const [alchemyStep, setAlchemyStep] = useState(0);
-  
-  const [voiceTranscript, setVoiceTranscript] = useState('');
-  const [userVolume, setUserVolume] = useState(0);
+  const [aiGreeting, setAiGreeting] = useState('');
 
-  const recognitionRef = useRef<any>(null);
-  const resultContainerRef = useRef<HTMLDivElement>(null);
-
+  // Fixed: Corrected initializeChat call and getInitialAISalutation parameters
   useEffect(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SpeechRecognition) {
-        recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.continuous = false;
-        recognitionRef.current.lang = language === 'ar' ? 'ar-EG' : 'en-US';
-        recognitionRef.current.onresult = (event: any) => {
-            setInputText(prev => prev + ' ' + event.results[0][0].transcript);
-            setIsListeningText(false);
-        };
-    }
-  }, [language]);
+    const initDreamSession = async () => {
+        setIsAnalyzing(true);
+        await initializeChat("Dreamer", t.dreamSystemInstruction, undefined, language);
+        // language is 2nd argument, context is 3rd
+        const greeting = await getInitialAISalutation('dream_analysis', language, 'mystic_lead');
+        setAiGreeting(greeting);
+        setIsAnalyzing(false);
+    };
+    initDreamSession();
+  }, [language, t.dreamSystemInstruction]);
 
-  const startVoiceMode = useCallback(() => {
-      setActiveMode('voice');
-      const voiceForDream = language === 'ar' ? 'Charon' : 'Zephyr';
-      const sysInstruct = language === 'ar' ? DREAM_SYSTEM_INSTRUCTION_AR : DREAM_SYSTEM_INSTRUCTION_EN;
-      
-      const personalizedInstruction = language === 'ar' 
-        ? `${sysInstruct}\n\nنادِ المستخدم باسمه: ${user.name}. ابدأ بدعوة المستخدم لسرد حلمه بأسلوب هادئ ومنوم.`
-        : `${sysInstruct}\n\nSpeak EXCLUSIVELY in English. Call the user by name: ${user.name}. Start by inviting the user to describe their dream in a slow, hypnotic English tone.`;
-
-      liveVoiceService.connect({
-          voiceName: voiceForDream,
-          systemInstruction: personalizedInstruction,
-          onTranscript: (text) => setVoiceTranscript(prev => prev + text),
-          onVolumeUpdate: (v) => setUserVolume(v),
-          onError: (e) => {
-              console.error(e);
-              setActiveMode('selection');
-          }
-      });
-  }, [language, user.name]);
-
-  const stopVoiceMode = useCallback(() => {
-      liveVoiceService.stop();
-      if (voiceTranscript) {
-          const entry: JournalEntry = {
-              id: Date.now().toString(),
-              date: new Date(),
-              text: `🎙️ ${language === 'ar' ? 'رحلة صوتية في الحلم' : 'Voice Dream Dive'} for ${user.name}:\n\n${voiceTranscript}`,
-              tags: ['#DreamDive', '#Voice'],
-              sentiment: 'neutral'
-          };
-          const existing = JSON.parse(localStorage.getItem('sakinnah_journal') || '[]');
-          localStorage.setItem('sakinnah_journal', JSON.stringify([entry, ...existing]));
-          syncService.pushToCloud(user.username);
-      }
-      setActiveMode('selection');
-      setVoiceTranscript('');
-  }, [user.name, user.username, voiceTranscript, language]);
-
-  const handleAnalyzeText = async () => {
-      if (!inputText.trim()) return;
-      setIsAnalyzing(true);
-      setAnalysis('');
-      setIsSaved(false);
-      setAlchemyStep(1);
-
-      const stepTimer = setInterval(() => {
-          setAlchemyStep(prev => (prev < 3 ? prev + 1 : prev));
-      }, 3000);
-
-      try {
-          const sysInstruct = language === 'ar' ? DREAM_SYSTEM_INSTRUCTION_AR : DREAM_SYSTEM_INSTRUCTION_EN;
-          await initializeChat(`Dreamer: ${user.name}`, sysInstruct, undefined, language);
-          const combinedPrompt = `DREAM: ${inputText}\nEMOTIONS: ${emotions}`;
-          const stream = sendMessageStreamToGemini(combinedPrompt, language);
-          let fullText = "";
-          for await (const chunk of stream) {
-              fullText += chunk;
-              setAnalysis(fullText);
-          }
-      } catch (e) {
-          setAnalysis(isRTL ? "فشلنا في الوصول لمستودع الأحلام حالياً." : "Dream repository unreachable.");
-      } finally {
-          clearInterval(stepTimer);
-          setIsAnalyzing(false);
-      }
-  };
-
-  const handleSaveText = () => {
-      if (!analysis || isSaved) return;
-      const entry: JournalEntry = {
-          id: Date.now().toString(),
-          date: new Date(),
-          text: `🌌 Dream Analysis for ${user.name}:\n\nDream: ${inputText}\n\n${analysis}`,
-          tags: ['#DreamProbe', '#Psychology'],
-          sentiment: 'neutral'
-      };
-      const existing = JSON.parse(localStorage.getItem('sakinnah_journal') || '[]');
-      localStorage.setItem('sakinnah_journal', JSON.stringify([entry, ...existing]));
-      syncService.pushToCloud(user.username);
-      setIsSaved(true);
-  };
-
-  const renderAnalysisParts = (text: string) => {
-      const parts = text.split('###');
-      return parts.map((part, i) => {
-          if (!part.trim()) return null;
-          let Icon = Sparkles;
-          let color = "indigo";
-          if (part.includes('رموز') || part.includes('Symbol')) { Icon = Key; color = "amber"; }
-          if (part.includes('النبض') || part.includes('Emotional')) { Icon = HeartPulse; color = "rose"; }
-          if (part.includes('تكامل') || part.includes('Integration')) { Icon = Lightbulb; color = "teal"; }
-          const lines = part.trim().split('\n');
-          const title = lines[0];
-          const content = lines.slice(1).join('\n');
-          return (
-              <div key={i} className={`bg-white/5 backdrop-blur-2xl border border-${color}-500/20 rounded-[2rem] p-6 mb-6 animate-slideUp`}>
-                  <div className={`flex items-center gap-3 mb-4 text-${color}-300`}>
-                      <div className={`p-2 bg-${color}-500/10 rounded-xl`}><Icon size={22} /></div>
-                      <h3 className="font-bold text-lg">{title}</h3>
-                  </div>
-                  <div className="text-indigo-100/90 text-sm leading-relaxed whitespace-pre-wrap font-medium">{content}</div>
-              </div>
-          );
-      });
+  const handleAnalyze = async () => {
+    if (!input.trim()) return;
+    setIsAnalyzing(true);
+    setAnalysis('');
+    try {
+        const stream = sendMessageStreamToGemini(input, language);
+        let full = '';
+        for await (const chunk of stream) {
+            full += chunk;
+            setAnalysis(full);
+        }
+    } catch (e) { console.error(e); } finally { setIsAnalyzing(false); }
   };
 
   return (
-    <div className="h-full bg-[#050510] flex flex-col pt-safe pb-safe animate-fadeIn text-white overflow-hidden relative">
-      <header className="px-6 py-4 z-20 flex items-center justify-between bg-black/40 backdrop-blur-xl border-b border-white/5">
-         <div className="flex items-center gap-4">
-             <button onClick={activeMode === 'selection' ? onBack : () => { stopVoiceMode(); setActiveMode('selection'); }} className="p-2.5 bg-white/5 hover:bg-white/10 rounded-2xl transition-all border border-white/10">
-                 {isRTL ? <ArrowRight size={20} /> : <ArrowLeft size={20} />}
-             </button>
-             <div>
-                 <h1 className="text-xl font-black text-indigo-100 flex items-center gap-2">
-                     <Brain size={20} className="text-indigo-400" /> {t.dreamAnalysis}
-                 </h1>
-                 <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest">{t.dreamPortalTitle}</p>
-             </div>
-         </div>
+    <div className="h-full bg-[#030712] flex flex-col pt-safe pb-safe text-white overflow-hidden animate-fadeIn relative">
+      {/* Immersive Background Star Field Effect */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,#4c1d95,transparent_50%)] opacity-40"></div>
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10"></div>
+      
+      <header className="px-8 py-8 border-b border-white/10 bg-black/40 backdrop-blur-3xl z-20 flex items-center justify-between">
+        <div className="flex items-center gap-5">
+            <button onClick={onBack} className="p-3 bg-white/5 border border-white/10 rounded-2xl active:scale-90 transition-all hover:bg-mystic-500/20">
+                {isRTL ? <ArrowRight size={22} /> : <ArrowLeft size={22} />}
+            </button>
+            <div>
+                <h1 className="text-base font-black tracking-widest uppercase text-mystic-400">{t.dreamWing}</h1>
+                <p className="text-[8px] font-black text-white/30 tracking-widest uppercase">Deep Consciousness Protocol v4.1</p>
+            </div>
+        </div>
+        <div className="p-3 bg-white/5 rounded-2xl"><Moon size={24} className="text-mystic-400 animate-pulse-soft" /></div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-6 relative z-10 no-scrollbar">
-          {activeMode === 'selection' && (
-              <div className="flex flex-col items-center justify-center h-full space-y-8 animate-slideUp">
-                   <Stars size={64} className="text-indigo-300 animate-pulse" />
-                   <h2 className="text-3xl font-black">{isRTL ? 'كيف تريد البدء؟' : 'Choose Your Path'}</h2>
-                   <div className="grid grid-cols-1 gap-4 w-full max-w-sm">
-                        <button onClick={() => setActiveMode('text')} className="w-full bg-white/5 border border-white/10 p-6 rounded-[2.5rem] flex items-center gap-5 hover:bg-white/10 transition-all">
-                             <MessageSquareText size={32} className="text-blue-400" />
-                             <div className="text-start">
-                                <h4 className="font-black text-xl">{t.dreamTextMode}</h4>
-                                <p className="text-xs text-indigo-300/50">{isRTL ? 'دوّن حلمك بالكلمات' : 'Write your dream'}</p>
-                             </div>
+      <main className="flex-1 overflow-y-auto no-scrollbar p-10 z-10 space-y-12">
+        {!analysis && !isAnalyzing ? (
+            <div className="h-full flex flex-col items-center justify-center text-center space-y-12 animate-reveal">
+                <div className="relative group">
+                    <div className="absolute inset-0 bg-mystic-500/20 blur-[80px] rounded-full group-hover:scale-150 transition-transform duration-[3000ms]"></div>
+                    <Stars size={100} className="text-mystic-300 animate-float-slow relative z-10" />
+                    <Sparkles className="absolute -top-6 -right-6 text-amber-300 animate-pulse relative z-10" size={32} />
+                </div>
+                <div className="space-y-6">
+                    <h2 className="text-4xl font-black italic tracking-tighter font-serif">{isRTL ? 'بوابة الأحلام' : 'Portal of Dreams'}</h2>
+                    <div className="bg-white/5 p-8 rounded-[3.5rem] border border-white/10 italic text-mystic-200 text-sm leading-relaxed max-w-md font-medium backdrop-blur-xl">
+                        {aiGreeting || (isRTL ? "أخبرني عما رأيت في منامك، وسأكشف لك ما وراء الصور..." : "Tell me about your vision, I will reveal what lies beneath...")}
+                    </div>
+                </div>
+                <textarea 
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-[3rem] p-10 text-white h-64 resize-none outline-none focus:border-mystic-500/50 transition-all text-base leading-relaxed font-medium placeholder-white/20"
+                    placeholder={isRTL ? "صف حلمك، الألوان، الرموز، والمشاعر التي أيقظك بها..." : "Describe colors, symbols, feelings that lingered..."}
+                />
+                <button onClick={handleAnalyze} className="w-full h-24 bg-mystic-600 rounded-[3rem] font-black uppercase tracking-[0.5em] text-lg shadow-[0_20px_50px_rgba(139,92,246,0.3)] flex items-center justify-center gap-6 active:scale-95 transition-all border border-mystic-400/30">
+                    <span>{isRTL ? 'فك رموز الحلم' : 'Decode Vision'}</span>
+                    <KeyRound size={28} />
+                </button>
+            </div>
+        ) : (
+            <div className="space-y-8 pb-32">
+                {isAnalyzing && !analysis && (
+                    <div className="flex flex-col items-center justify-center py-32 gap-6">
+                        <div className="w-16 h-16 border-4 border-mystic-400 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.5em] text-mystic-300 animate-pulse">{t.analyzing}</p>
+                    </div>
+                )}
+                {analysis && (
+                    <div className="bg-white/5 border border-white/10 rounded-[4rem] p-12 backdrop-blur-3xl animate-fadeIn shadow-2xl relative overflow-hidden group">
+                        <div className="absolute -top-20 -left-20 w-60 h-60 bg-mystic-500/10 rounded-full blur-3xl group-hover:scale-110 transition-transform duration-[3000ms]"></div>
+                        <div className="flex items-center gap-5 mb-10 text-mystic-400">
+                            <div className="p-3 bg-mystic-500/10 rounded-2xl"><Brain size={32} /></div>
+                            <h3 className="font-black uppercase tracking-[0.3em] text-xl">{isRTL ? 'تحليل البصيرة' : 'Insight Analysis'}</h3>
+                        </div>
+                        <p className="text-mystic-100 text-xl leading-[1.8] italic font-medium whitespace-pre-wrap font-serif">
+                            {analysis}
+                        </p>
+                        <button onClick={() => setAnalysis('')} className="mt-12 w-full py-5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-3xl text-[10px] font-black uppercase tracking-[0.4em] transition-all">
+                             {isRTL ? 'تحليل حلم آخر' : 'Analyze Another Dream'}
                         </button>
-                        <button onClick={startVoiceMode} className="w-full bg-white/5 border border-white/10 p-6 rounded-[2.5rem] flex items-center gap-5 hover:bg-white/10 transition-all">
-                             <Mic size={32} className="text-purple-400" />
-                             <div className="text-start">
-                                <h4 className="font-black text-xl">{t.dreamVoiceMode}</h4>
-                                <p className="text-xs text-indigo-300/50">{t.dreamVoiceDesc}</p>
-                             </div>
-                        </button>
-                   </div>
-              </div>
-          )}
-          {activeMode === 'text' && (
-              <div className="h-full flex flex-col">
-                  {!analysis && !isAnalyzing ? (
-                      <div className="flex flex-col items-center justify-center h-full space-y-6">
-                          <textarea 
-                              value={inputText}
-                              onChange={(e) => setInputText(e.target.value)}
-                              placeholder={t.dreamPlaceholder}
-                              className="w-full bg-white/5 border border-white/10 rounded-3xl p-6 text-indigo-50 h-56 resize-none"
-                          />
-                          <button onClick={handleAnalyzeText} disabled={!inputText.trim()} className="w-full py-5 bg-gradient-to-r from-indigo-600 to-purple-800 text-white rounded-3xl font-black">
-                             {isRTL ? 'ابدأ الخيمياء النفسية' : 'Begin Soul Alchemy'}
-                          </button>
-                      </div>
-                  ) : (
-                      <div className="space-y-6 pb-32">
-                          {isAnalyzing && <Loader2 className="animate-spin mx-auto text-indigo-400" size={48} />}
-                          {analysis && renderAnalysisParts(analysis)}
-                      </div>
-                  )}
-              </div>
-          )}
-          {activeMode === 'voice' && (
-              <div className="h-full flex flex-col items-center justify-center text-center space-y-12">
-                  <div className={`w-64 h-64 bg-gradient-to-br from-indigo-600/20 to-purple-800/20 rounded-full flex items-center justify-center border-4 border-white/10 shadow-2xl transition-all duration-300 ${userVolume > 0.05 ? 'scale-105' : 'scale-100'}`}>
-                      <Volume2 size={100} className={`text-indigo-200 ${userVolume > 0.05 ? 'animate-pulse' : 'opacity-40'}`} />
-                  </div>
-                  <h2 className="text-3xl font-black">{isRTL ? 'غوص في اللاوعي' : 'Dive Deep'}</h2>
-                  <button onClick={stopVoiceMode} className="w-full py-5 bg-red-600/90 text-white rounded-[2rem] font-black">
-                      <Phone size={24} className="rotate-[135deg] inline mr-2" /> {t.dreamStopVoice}
-                  </button>
-              </div>
-          )}
+                    </div>
+                )}
+            </div>
+        )}
       </main>
+      
+      <div className="absolute bottom-10 left-0 w-full text-center opacity-20 pointer-events-none z-0">
+          <p className="text-[9px] font-black tracking-[0.6em] uppercase">Subconscious Connection Active</p>
+      </div>
     </div>
   );
 };

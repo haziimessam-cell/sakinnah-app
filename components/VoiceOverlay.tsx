@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Category, Language, User } from '../types';
-import { X, Mic, VolumeX, Phone, Video, VideoOff, Sparkles, Brain, Activity, Zap, ShieldCheck } from 'lucide-react';
+import { X, Mic, VolumeX, Phone, Video, VideoOff, Sparkles, Brain, Activity, Zap, ShieldCheck, MessageSquare } from 'lucide-react';
 import { translations } from '../translations';
 import { liveVoiceService } from '../services/liveVoiceService';
 
@@ -10,9 +10,10 @@ interface Props {
   language: Language;
   user: User;
   onClose: () => void;
+  onSwitchToText?: () => void;
 }
 
-const VoiceOverlay: React.FC<Props> = ({ category, language, user, onClose }) => {
+const VoiceOverlay: React.FC<Props> = ({ category, language, user, onClose, onSwitchToText }) => {
   const t = translations[language] as any;
   const isRTL = language === 'ar';
   
@@ -26,7 +27,6 @@ const VoiceOverlay: React.FC<Props> = ({ category, language, user, onClose }) =>
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // منطق اختيار الصوت والتعليمات بناءً على اللغة والجنس
   const getVoiceConfig = () => {
     if (language === 'ar') {
       return {
@@ -112,10 +112,13 @@ const VoiceOverlay: React.FC<Props> = ({ category, language, user, onClose }) =>
               <X size={24} />
           </button>
           <div className="flex flex-col items-end gap-2">
-              <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-xl backdrop-blur-xl">
-                  <Activity size={16} className="text-emerald-400 animate-pulse" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em]">{aiState}</span>
-              </div>
+              <button 
+                onClick={onSwitchToText}
+                className="flex items-center gap-2 bg-indigo-600 px-4 py-2 rounded-xl backdrop-blur-xl shadow-lg border border-indigo-400 active:scale-95 transition-all"
+              >
+                  <MessageSquare size={16} />
+                  <span className="text-[10px] font-black uppercase tracking-[0.1em]">{isRTL ? 'شات نصي' : 'TEXT CHAT'}</span>
+              </button>
               <div className="flex flex-wrap justify-end gap-2 max-w-[200px]">
                   {detectedKeywords.map((kw, i) => (
                       <span key={i} className="text-[8px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-md animate-reveal uppercase font-black">
@@ -138,7 +141,7 @@ const VoiceOverlay: React.FC<Props> = ({ category, language, user, onClose }) =>
           </div>
 
           <div className="relative group cursor-pointer" onClick={() => setIsVideoOn(!isVideoOn)}>
-              <div className={`absolute inset-[-40px] rounded-full blur-3xl opacity-30 transition-all duration-1000 ${aiState === 'speaking' ? 'bg-indigo-500 animate-pulse' : 'bg-emerald-500'}`}></div>
+              <div className={`absolute inset-[-40px] rounded-full blur-3xl opacity-30 transition-all duration-1000 ${aiState === 'speaking' ? 'bg-indigo-50 animate-pulse' : 'bg-emerald-500'}`}></div>
               <div className={`w-56 h-56 rounded-full flex items-center justify-center relative z-10 border-4 border-white/10 shadow-2xl transition-all duration-500 overflow-hidden
                   ${aiState === 'speaking' ? 'scale-110' : aiState === 'thinking' ? 'scale-105' : 'scale-100'}
                   ${aiState === 'speaking' ? 'bg-indigo-900/40' : 'bg-emerald-900/40'}`}>
@@ -154,7 +157,7 @@ const VoiceOverlay: React.FC<Props> = ({ category, language, user, onClose }) =>
           <div className="mt-16 text-center space-y-4 px-10">
               <h2 className="text-2xl font-black tracking-tight">{isVideoOn ? (isRTL ? 'بصيرة سكينة مفعلة' : 'Sakinnah Insight ON') : (isRTL ? 'سكينة تسمعك' : 'Sakinnah Listening')}</h2>
               <div className="h-20 max-w-sm flex items-center justify-center">
-                  <p className="text-indigo-200/60 text-sm italic font-medium leading-relaxed animate-fadeIn line-clamp-3">
+                  <p className="text-indigo-200/60 text-sm italic font-medium leading-relaxed animate-fadeIn line-clamp-3 text-center">
                       {transcript || (isRTL ? "أنا معك بكل حواسي، تفضل بالحديث..." : "I'm here with you, please tell me what's on your mind...")}
                   </p>
               </div>

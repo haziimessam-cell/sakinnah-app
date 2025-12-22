@@ -1,439 +1,176 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Language, User, JournalEntry } from '../types';
+import { Language, User, Role, Message } from '../types';
 import { translations } from '../translations';
-import { FADFADA_SILENT_PROMPT_AR, FADFADA_SILENT_PROMPT_EN, FADFADA_FLOW_PROMPT_AR, FADFADA_FLOW_PROMPT_EN } from '../constants';
-import { sendMessageStreamToGemini, initializeChat, generateContent } from '../services/geminiService';
-import { syncService } from '../services/syncService';
-import { ArrowRight, ArrowLeft, Mic, MicOff, BookOpen, Send, ShieldCheck, Heart, Volume2, CircleStop, EyeOff, Lock, HeartHandshake } from 'lucide-react';
+import { sendMessageStreamToGemini, initializeChat } from '../services/geminiService';
+// Fix: Added missing ChevronRight import for the mode selection list
+import { 
+    ArrowRight, ArrowLeft, Send, ShieldCheck, Heart, 
+    EyeOff, Lock, HeartHandshake, MessageSquare, Sparkles, CloudSun, ChevronRight
+} from 'lucide-react';
+import ChatMessage from './ChatMessage';
 
 interface Props {
   onBack: () => void;
   language: Language;
   user: User;
-  initialMode?: 'silent' | 'voice' | 'flow' | 'hug';
 }
 
 type FadfadaMode = 'silent' | 'voice' | 'flow' | 'hug';
 
-const FadfadaSection: React.FC<Props> = ({ onBack, language, user, initialMode }) => {
+const FadfadaSection: React.FC<Props> = ({ onBack, language, user }) => {
   const t = translations[language] as any;
   const isRTL = language === 'ar';
   
   const [mode, setMode] = useState<FadfadaMode | null>(null);
   const [inputText, setInputText] = useState('');
-  const [chatHistory, setChatHistory] = useState<{role: 'user' | 'model', text: string}[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const [isJournalSaved, setIsJournalSaved] = useState(false);
   const [isHugging, setIsHugging] = useState(false);
   
-  const recognitionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-      // Scroll to bottom of chat
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatHistory, isStreaming]);
-
-  // Haptic Heartbeat Effect for Hug Mode
-  useEffect(() => {
-      let interval: ReturnType<typeof setInterval>;
-      if (mode === 'hug' && isHugging) {
-          const heartbeat = () => {
-              if (navigator.vibrate) {
-                  // Simulating a heartbeat: lub-dub
-                  navigator.vibrate([60, 100, 60]);
-              }
-          };
-          heartbeat(); // Immediate beat
-          interval = setInterval(heartbeat, 1200); // Repeat every 1.2s (approx 50 BPM - calming)
-      }
-      return () => clearInterval(interval);
-  }, [mode, isHugging]);
-
-  // Init Speech Recognition
-  useEffect(() => {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      if (SpeechRecognition) {
-          recognitionRef.current = new SpeechRecognition();
-          recognitionRef.current.continuous = true;
-          recognitionRef.current.interimResults = true;
-          recognitionRef.current.lang = language === 'ar' ? 'ar-EG' : 'en-US';
-          
-          recognitionRef.current.onresult = (event: any) => {
-              let final = '';
-              for (let i = event.resultIndex; i < event.results.length; ++i) {
-                  if (event.results[i].isFinal) final += event.results[i][0].transcript;
-              }
-              if (final) {
-                  setInputText(prev => prev + ' ' + final);
-              }
-          };
-      }
-  }, [language]);
+  }, [messages, isStreaming]);
 
   const startMode = async (selectedMode: FadfadaMode) => {
-      // Check speech support
-      if (selectedMode === 'voice' && !recognitionRef.current) {
-         alert(language === 'ar' ? 'عذراً، متصفحك لا يدعم التعرف على الصوت.' : 'Sorry, your browser does not support speech recognition.');
-         return;
-      }
-
-      if (navigator.vibrate) navigator.vibrate(10);
       setMode(selectedMode);
-      setChatHistory([]);
-      setInputText('');
+      setMessages([]);
       
-      let sysPrompt = '';
-      if (selectedMode === 'silent') sysPrompt = language === 'ar' ? FADFADA_SILENT_PROMPT_AR : FADFADA_SILENT_PROMPT_EN;
-      if (selectedMode === 'flow') sysPrompt = language === 'ar' ? FADFADA_FLOW_PROMPT_AR : FADFADA_FLOW_PROMPT_EN;
-      
-      // For Voice Vent and Hug, we don't init chat immediately
-      if (selectedMode === 'silent' || selectedMode === 'flow') {
-          await initializeChat("Fadfada Session", sysPrompt, undefined, language);
-      } else if (selectedMode === 'voice') {
-          // Auto-start recording if entering voice mode
-          setTimeout(() => toggleRecording(), 500);
-      }
-  };
-  
-  // Auto-trigger initial mode
-  useEffect(() => {
-      if (initialMode) startMode(initialMode);
-  }, []);
-
-  const handleSendMessage = async () => {
-      if (!inputText.trim()) return;
-      if (navigator.vibrate) navigator.vibrate(5);
-      
-      const userMsg = inputText;
-      setChatHistory(prev => [...prev, { role: 'user', text: userMsg }]);
-      setInputText('');
-      setIsStreaming(true);
-
-      try {
-          const stream = sendMessageStreamToGemini(userMsg, language);
-          let aiResponse = '';
+      if (selectedMode !== 'hug') {
+          setIsStreaming(true);
+          const sys = selectedMode === 'silent' 
+            ? (isRTL ? "أنت مستمع صامت، ردودك محدودة جداً واحتوائية بكلمة أو كلمتين." : "Silent listener mode, minimal and containing responses of 1-2 words.")
+            : (isRTL ? "أنت رفيق فضفضة متعاطف للغاية، نادِ المستخدم باسمه وشجعه على الحديث." : "Highly empathetic venting companion, call the user by name and encourage them.");
+          await initializeChat("Fadfada", sys, undefined, language);
           
-          setChatHistory(prev => [...prev, { role: 'model', text: '' }]);
-          
-          for await (const chunk of stream) {
-              aiResponse += chunk;
-              setChatHistory(prev => {
-                  const newHist = [...prev];
-                  newHist[newHist.length - 1].text = aiResponse;
-                  return newHist;
-              });
-          }
-      } catch (e) {
-          console.error(e);
-      } finally {
+          const aiGreet = language === 'ar' ? t.aiGreetVent : t.aiGreetVent;
+          const aiMsg: Message = { id: Date.now().toString(), role: Role.MODEL, text: aiGreet, timestamp: new Date() };
+          setMessages([aiMsg]);
           setIsStreaming(false);
       }
   };
 
-  const toggleRecording = () => {
-      if (navigator.vibrate) navigator.vibrate(20);
-      if (isRecording) {
-          // STOP
-          if (recognitionRef.current) recognitionRef.current.stop();
-          if (timerRef.current) clearInterval(timerRef.current);
-          setIsRecording(false);
-          
-          // If Voice Mode, analyze immediately
-          if (mode === 'voice') {
-              processVoiceVent();
-          }
-      } else {
-          // START
-          setInputText('');
-          setRecordingTime(0);
-          if (recognitionRef.current) recognitionRef.current.start();
-          setIsRecording(true);
-          timerRef.current = setInterval(() => setRecordingTime(prev => prev + 1), 1000);
-      }
-  };
-
-  const processVoiceVent = async () => {
+  const handleSend = async () => {
+      if (!inputText.trim()) return;
+      const userMsg: Message = { id: Date.now().toString(), role: Role.USER, text: inputText, timestamp: new Date() };
+      setMessages(prev => [...prev, userMsg]);
+      setInputText('');
       setIsStreaming(true);
-      const prompt = language === 'ar' 
-        ? `المستخدم قام بفضفضة صوتية: "${inputText}". 
-           مطلوب منك: 
-           1. تلخيص المشاعر بكلمات دافئة.
-           2. جملة احتواء قصيرة جداً (مثل: أنا حاسس بيك، حقك تزعل).
-           بدون نصائح.`
-        : `User vented via voice: "${inputText}". 
-           Task: 
-           1. Summarize emotions warmly. 
-           2. Short validation phrase. 
-           NO advice.`;
-      
-      const response = await generateContent(prompt);
-      if (response) {
-          setChatHistory([{ role: 'user', text: t.voiceVent + ' 🎙️' }, { role: 'model', text: response }]);
-      }
-      setIsStreaming(false);
-  };
 
-  const saveToJournal = () => {
-      if (navigator.vibrate) navigator.vibrate(50);
-      const fullText = chatHistory.map(m => `${m.role === 'user' ? 'Me' : 'Sakinnah'}: ${m.text}`).join('\n\n');
-      const entry: JournalEntry = {
-          id: Date.now().toString(),
-          date: new Date(),
-          text: fullText,
-          tags: ['#Fadfada', `#${mode}`],
-          sentiment: 'neutral'
-      };
-      
-      const existing = JSON.parse(localStorage.getItem('sakinnah_journal') || '[]');
-      localStorage.setItem('sakinnah_journal', JSON.stringify([entry, ...existing]));
-      syncService.pushToCloud(user.username);
-      setIsJournalSaved(true);
-      setTimeout(() => setIsJournalSaved(false), 3000);
-  };
-
-  const formatTime = (seconds: number) => {
-      const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      return `${mins}:${secs.toString().padStart(2, '0')}`;
+      try {
+          const stream = sendMessageStreamToGemini(userMsg.text, language);
+          let aiText = '';
+          const aiId = (Date.now() + 1).toString();
+          setMessages(prev => [...prev, { id: aiId, role: Role.MODEL, text: '', timestamp: new Date() }]);
+          
+          for await (const chunk of stream) {
+              aiText += chunk;
+              setMessages(prev => prev.map(m => m.id === aiId ? { ...m, text: aiText } : m));
+          }
+      } catch (e) { console.error(e); } finally { setIsStreaming(false); }
   };
 
   return (
-    <div className="h-full bg-orange-50/30 flex flex-col pt-safe pb-safe animate-fadeIn overflow-hidden relative">
-        
-        {/* Header */}
-        <header className="px-4 py-4 flex items-center gap-3 border-b border-orange-100 bg-white/60 backdrop-blur-md sticky top-0 z-20 shadow-sm">
-            <button onClick={() => mode ? setMode(null) : onBack()} className="p-2 hover:bg-orange-100 rounded-full transition-colors text-orange-800 border border-transparent hover:border-orange-200">
-                {isRTL ? <ArrowRight size={24} /> : <ArrowLeft size={24} />}
-            </button>
-            <div className="flex-1">
-                <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                    {mode === 'hug' ? <HeartHandshake size={20} className="text-pink-500" /> : <Heart size={20} className="text-orange-500 fill-orange-500" />}
-                    {mode === 'silent' ? t.silentMode : mode === 'voice' ? t.voiceVent : mode === 'flow' ? t.flowChat : mode === 'hug' ? t.virtualHug : t.fadfadaTitle}
-                </h1>
-                {mode && <p className="text-xs text-orange-600 font-medium animate-fadeIn flex items-center gap-1"><ShieldCheck size={10} /> {t.safeSpace}</p>}
-            </div>
-            {mode && mode !== 'hug' && (
-                <button 
-                    onClick={saveToJournal}
-                    className={`p-2 rounded-full transition-all border border-transparent ${isJournalSaved ? 'bg-green-100 text-green-600 border-green-200' : 'bg-orange-100 text-orange-600 hover:bg-orange-200 hover:border-orange-200'}`}
-                    title={t.saveToFadfada}
-                >
-                    {isJournalSaved ? <Lock size={20} /> : <BookOpen size={20} />}
+    <div className="h-full bg-[#FFFBF7] flex flex-col pt-safe pb-safe animate-fadeIn overflow-hidden relative">
+        {/* Artistic Background blobs */}
+        <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-rose-200/20 rounded-full blur-[100px] pointer-events-none"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-orange-200/20 rounded-full blur-[100px] pointer-events-none"></div>
+
+        <header className="px-8 py-6 flex items-center justify-between border-b border-orange-100 bg-white/60 backdrop-blur-2xl z-20">
+            <div className="flex items-center gap-5">
+                <button onClick={() => mode ? setMode(null) : onBack()} className="p-3 bg-orange-50 rounded-2xl text-orange-600 border border-orange-100 hover:bg-orange-100 transition-all">
+                    {isRTL ? <ArrowRight size={22} /> : <ArrowLeft size={22} />}
                 </button>
-            )}
+                <div>
+                    <h1 className="text-lg font-black text-orange-950 tracking-tight uppercase">{mode ? t[`${mode}Mode`] || t.ventingWing : t.ventingWing}</h1>
+                    <p className="text-[10px] text-orange-400 font-black uppercase tracking-[0.2em] flex items-center gap-2">
+                        <Lock size={10} /> {isRTL ? 'مساحة سرية ومحمية' : 'PROTECTED PRIVATE SPACE'}
+                    </p>
+                </div>
+            </div>
+            {!mode && <CloudSun size={28} className="text-orange-300 animate-pulse" />}
         </header>
 
-        <main className="flex-1 overflow-y-auto relative no-scrollbar">
-            
-            {/* MODE SELECTION */}
-            {!mode && (
-                <div className="p-6 space-y-4 animate-slideUp">
-                    <div className="bg-gradient-to-br from-orange-400 to-red-400 p-6 rounded-[2.5rem] text-white shadow-lg shadow-orange-500/30 mb-8 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full blur-2xl -mr-10 -mt-10 group-hover:scale-125 transition-transform duration-700"></div>
-                        <h2 className="text-2xl font-bold mb-2 relative z-10">{t.fadfadaDesc}</h2>
-                        <p className="opacity-90 text-sm leading-relaxed max-w-xs relative z-10">{t.fadfadaPlaceholder}</p>
+        <main className="flex-1 overflow-y-auto no-scrollbar relative z-10">
+            {!mode ? (
+                <div className="p-10 space-y-10 animate-slideUp">
+                    <div className="bg-gradient-to-br from-orange-400 to-rose-500 p-10 rounded-[3.5rem] text-white shadow-2xl shadow-rose-500/20 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-125 transition-transform duration-[2000ms]"><Sparkles size={120} /></div>
+                        <h2 className="text-3xl font-black mb-3 italic tracking-tight">{t.ventingWing}</h2>
+                        <p className="text-sm opacity-90 leading-relaxed font-medium">{t.ventingDesc}</p>
                     </div>
 
-                    <button onClick={() => startMode('silent')} className="w-full bg-white/80 backdrop-blur-md p-5 rounded-3xl shadow-sm border border-orange-100 hover:shadow-md transition-all flex items-center gap-4 group active:scale-95">
-                        <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform shadow-sm">
-                            <EyeOff size={28} />
-                        </div>
-                        <div className="text-start">
-                            <h3 className="font-bold text-gray-800 text-lg group-hover:text-blue-600 transition-colors">{t.silentMode}</h3>
-                            <p className="text-gray-500 text-xs mt-1">{t.silentModeDesc}</p>
-                        </div>
-                    </button>
-
-                    <button onClick={() => startMode('voice')} className="w-full bg-white/80 backdrop-blur-md p-5 rounded-3xl shadow-sm border border-orange-100 hover:shadow-md transition-all flex items-center gap-4 group active:scale-95">
-                        <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center text-red-500 group-hover:scale-110 transition-transform shadow-sm">
-                            <Mic size={28} />
-                        </div>
-                        <div className="text-start">
-                            <h3 className="font-bold text-gray-800 text-lg group-hover:text-red-600 transition-colors">{t.voiceVent}</h3>
-                            <p className="text-gray-500 text-xs mt-1">{t.voiceVentDesc}</p>
-                        </div>
-                    </button>
-
-                    <button onClick={() => startMode('flow')} className="w-full bg-white/80 backdrop-blur-md p-5 rounded-3xl shadow-sm border border-orange-100 hover:shadow-md transition-all flex items-center gap-4 group active:scale-95">
-                        <div className="w-14 h-14 bg-green-50 rounded-2xl flex items-center justify-center text-green-500 group-hover:scale-110 transition-transform shadow-sm">
-                            <Volume2 size={28} />
-                        </div>
-                        <div className="text-start">
-                            <h3 className="font-bold text-gray-800 text-lg group-hover:text-green-600 transition-colors">{t.flowChat}</h3>
-                            <p className="text-gray-500 text-xs mt-1">{t.flowChatDesc}</p>
-                        </div>
-                    </button>
-
-                    {/* Hug Mode Button */}
-                    <button onClick={() => startMode('hug')} className="w-full bg-white/80 backdrop-blur-md p-5 rounded-3xl shadow-sm border border-orange-100 hover:shadow-md transition-all flex items-center gap-4 group active:scale-95">
-                        <div className="w-14 h-14 bg-pink-50 rounded-2xl flex items-center justify-center text-pink-500 group-hover:scale-110 transition-transform shadow-sm">
-                            <HeartHandshake size={28} />
-                        </div>
-                        <div className="text-start">
-                            <h3 className="font-bold text-gray-800 text-lg group-hover:text-pink-600 transition-colors">{t.virtualHug}</h3>
-                            <p className="text-gray-500 text-xs mt-1">{t.placeOnHeart}</p>
-                        </div>
-                    </button>
+                    <div className="grid grid-cols-1 gap-5">
+                        {[
+                            { id: 'flow', title: isRTL ? 'تدفق شعوري' : 'Emotional Flow', icon: <MessageSquare size={28} />, desc: isRTL ? 'حوار تفاعلي للفضفضة العميقة' : 'Interactive deep venting' },
+                            { id: 'silent', title: isRTL ? 'مستمع صامت' : 'Silent Listener', icon: <EyeOff size={28} />, desc: isRTL ? 'تفريغ دون أي مقاطعة' : 'Venting without interruption' },
+                            { id: 'hug', title: isRTL ? 'احتواء رقمي' : 'Digital Containment', icon: <HeartHandshake size={28} />, desc: isRTL ? 'تواصل حسي باللمس والنبض' : 'Sensory touch & pulse connection' }
+                        ].map((item) => (
+                            <button 
+                                key={item.id}
+                                onClick={() => startMode(item.id as any)}
+                                className="bg-white p-8 rounded-[3rem] border border-orange-50 shadow-sm flex items-center gap-8 active:scale-[0.98] transition-all text-start group hover:border-orange-300"
+                            >
+                                <div className="w-18 h-18 bg-orange-50 text-orange-500 rounded-[1.5rem] flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500">{item.icon}</div>
+                                <div className="flex-1">
+                                    <h3 className="font-black text-orange-900 text-lg mb-1">{item.title}</h3>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{item.desc}</p>
+                                </div>
+                                <ChevronRight size={20} className="text-orange-200 group-hover:text-orange-500 group-hover:translate-x-1 transition-all" />
+                            </button>
+                        ))}
+                    </div>
                 </div>
-            )}
-
-            {/* CHAT INTERFACE (Silent & Flow) */}
-            {(mode === 'silent' || mode === 'flow') && (
-                <div className="p-4 space-y-4 pb-24">
-                    {chatHistory.length === 0 && (
-                        <div className="text-center text-gray-400 py-20 animate-fadeIn">
-                            <Heart size={48} className="mx-auto mb-4 opacity-20" />
-                            <p className="font-medium text-sm">{t.imListening}</p>
-                        </div>
-                    )}
-                    {chatHistory.map((msg, i) => (
-                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'} animate-slideUp`}>
-                            <div className={`max-w-[85%] rounded-[1.5rem] px-6 py-4 text-sm leading-relaxed shadow-sm ${
-                                msg.role === 'user' 
-                                ? 'bg-orange-500 text-white rounded-br-none shadow-orange-200' 
-                                : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
-                            }`}>
-                                {msg.text}
-                            </div>
-                        </div>
+            ) : mode === 'hug' ? (
+                <div className="flex flex-col items-center justify-center h-full p-10 text-center space-y-16 animate-fadeIn">
+                    <div 
+                        onPointerDown={() => { setIsHugging(true); if(navigator.vibrate) navigator.vibrate([10, 100, 10]); }}
+                        onPointerUp={() => setIsHugging(false)}
+                        className={`w-72 h-72 rounded-full flex items-center justify-center transition-all duration-[1500ms] cursor-pointer select-none border-8 perspective-1000 ${isHugging ? 'scale-110 bg-rose-500 border-rose-200 shadow-[0_0_100px_rgba(244,63,94,0.6)] rotate-12' : 'bg-white border-rose-50 shadow-2xl shadow-rose-100'}`}
+                    >
+                        <Heart size={120} className={`transition-all duration-[1000ms] ${isHugging ? 'text-white fill-white scale-125' : 'text-rose-300 animate-pulse'}`} />
+                    </div>
+                    <div className="space-y-6">
+                        <h2 className="text-3xl font-black text-rose-900 tracking-tighter italic">{isHugging ? (isRTL ? 'أنا معك الآن...' : 'I am with you now...') : (isRTL ? 'اضغط مطولاً للسكينة' : 'Hold for Serenity')}</h2>
+                        <p className="text-gray-400 text-sm max-w-xs mx-auto font-medium leading-relaxed">
+                            {isRTL ? 'ضع إصبعك على القلب، واشعر بمحاكاة النبض لتهدئة جهازك العصبي.' : 'Place your finger on the heart; feel the simulated pulse to calm your nervous system.'}
+                        </p>
+                    </div>
+                </div>
+            ) : (
+                <div className="p-8 space-y-10 pb-40">
+                    {messages.map((m) => (
+                        <ChatMessage key={m.id} msg={m} language={language} isStreaming={false} isSpeaking={false} copiedId={null} onSpeak={()=>{}} onCopy={()=>{}} onBookmark={()=>{}} />
                     ))}
                     {isStreaming && (
-                        <div className="flex justify-end animate-fadeIn">
-                             <div className="bg-white px-5 py-4 rounded-2xl rounded-bl-none border border-gray-100 flex items-center gap-3 shadow-sm">
-                                <span className="text-xs text-gray-400 font-bold">{t.imWithYou}</span>
-                                <div className="flex space-x-1 space-x-reverse">
-                                    <div className="w-1.5 h-1.5 bg-orange-300 rounded-full animate-bounce"></div>
-                                    <div className="w-1.5 h-1.5 bg-orange-300 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                                </div>
-                             </div>
+                        <div className="text-start px-10">
+                            <div className="flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce"></div>
+                                <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                                <div className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                            </div>
                         </div>
                     )}
                     <div ref={messagesEndRef} />
                 </div>
             )}
-
-            {/* VOICE VENT INTERFACE */}
-            {mode === 'voice' && (
-                <div className="flex flex-col items-center justify-center h-full p-6 text-center space-y-8 animate-fadeIn">
-                    <div className={`w-56 h-56 rounded-full flex items-center justify-center transition-all duration-500 relative ${isRecording ? 'bg-red-50 shadow-[0_0_60px_rgba(239,68,68,0.3)] scale-110' : 'bg-white shadow-sm border border-gray-100'}`}>
-                        {isRecording && (
-                            <>
-                                <div className="absolute inset-0 border-4 border-red-200 rounded-full animate-ping opacity-50"></div>
-                                <div className="absolute inset-0 border-4 border-red-200 rounded-full animate-ping opacity-30" style={{animationDelay: '0.5s'}}></div>
-                                {/* Living Breath Visualizer */}
-                                <div className="absolute -bottom-16 flex items-end gap-1 h-12 justify-center opacity-70">
-                                    {[...Array(5)].map((_, i) => (
-                                        <div key={i} className="w-1.5 bg-red-400 rounded-full animate-bounce" style={{height: `${Math.random() * 100}%`, animationDelay: `${i * 0.1}s`}}></div>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-                        <Mic size={80} className={`transition-colors drop-shadow-md ${isRecording ? 'text-red-500' : 'text-gray-300'}`} />
-                    </div>
-                    
-                    <div>
-                        <h2 className={`text-4xl font-bold font-mono tabular-nums tracking-wider ${isRecording ? 'text-red-600' : 'text-gray-300'}`}>
-                            {formatTime(recordingTime)}
-                        </h2>
-                        <p className="text-gray-500 text-sm mt-3 font-medium bg-white/50 px-4 py-1 rounded-full inline-block backdrop-blur-sm">
-                            {isRecording ? t.listening : t.voiceVentDesc}
-                        </p>
-                    </div>
-
-                    {inputText && !isRecording && (
-                        <div className="w-full bg-white p-6 rounded-[2rem] shadow-md border border-gray-100 text-start max-h-60 overflow-y-auto animate-slideUp">
-                            <p className="text-gray-600 text-sm leading-relaxed italic border-l-2 border-orange-200 pl-3">"{inputText}"</p>
-                            {chatHistory.length > 0 && (
-                                <div className="mt-6 pt-4 border-t border-gray-50">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <Heart size={14} className="text-orange-500 fill-orange-500" />
-                                        <span className="text-xs font-bold text-orange-500 uppercase">{t.sakinnahNote}</span>
-                                    </div>
-                                    <p className="text-gray-800 font-bold text-sm leading-relaxed">{chatHistory[chatHistory.length-1].text}</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* HUG MODE INTERFACE */}
-            {mode === 'hug' && (
-                <div className="flex flex-col items-center justify-center h-full p-6 text-center space-y-12 animate-fadeIn relative">
-                    <div className="absolute inset-0 bg-pink-100/30 animate-pulse pointer-events-none" style={{animationDuration: '4s'}}></div>
-                    
-                    <div 
-                        className={`w-64 h-64 rounded-full flex items-center justify-center transition-all duration-1000 relative cursor-pointer select-none active:scale-95 ${isHugging ? 'scale-110 shadow-[0_0_80px_rgba(244,114,182,0.6)]' : 'shadow-xl shadow-pink-200 scale-100'}`}
-                        onTouchStart={(e) => { e.preventDefault(); setIsHugging(true); }}
-                        onTouchEnd={() => setIsHugging(false)}
-                        onMouseDown={() => setIsHugging(true)}
-                        onMouseUp={() => setIsHugging(false)}
-                        onMouseLeave={() => setIsHugging(false)}
-                        style={{ background: 'linear-gradient(135deg, #fbcfe8 0%, #f9a8d4 100%)' }}
-                    >
-                        {/* Pulsating Waves when hugging */}
-                        {isHugging && (
-                            <>
-                                <div className="absolute inset-0 border-4 border-pink-300 rounded-full animate-ping opacity-60"></div>
-                                <div className="absolute inset-0 border-4 border-pink-300 rounded-full animate-ping opacity-40" style={{animationDelay: '0.4s'}}></div>
-                                <div className="absolute inset-0 border-4 border-pink-300 rounded-full animate-ping opacity-20" style={{animationDelay: '0.8s'}}></div>
-                            </>
-                        )}
-                        
-                        <div className={`transition-all duration-700 ${isHugging ? 'scale-125' : 'scale-100 animate-breathing'}`}>
-                            <Heart size={100} className="text-white fill-white drop-shadow-lg" />
-                        </div>
-                    </div>
-
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-800 mb-2">{isHugging ? (language === 'ar' ? 'أنا معك...' : 'I am here...') : t.virtualHug}</h2>
-                        <p className="text-gray-500 text-sm max-w-xs mx-auto leading-relaxed">
-                            {isHugging ? (language === 'ar' ? 'تنفس ببطء... استشعر الهدوء.' : 'Breathe slowly... feel the calm.') : t.placeOnHeart}
-                        </p>
-                    </div>
-                </div>
-            )}
-
         </main>
 
-        {/* INPUT CONTROLS (Only for Chat modes) */}
         {mode && mode !== 'hug' && (
-            <div className="bg-white/80 backdrop-blur-xl p-4 pb-safe border-t border-white/50 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
-                {mode === 'voice' ? (
-                    <button 
-                        onClick={toggleRecording}
-                        className={`w-full py-5 rounded-2xl font-bold text-lg flex items-center justify-center gap-3 shadow-lg transition-all active:scale-95 ${
-                            isRecording 
-                            ? 'bg-red-500 text-white hover:bg-red-600 shadow-red-500/30' 
-                            : 'bg-gradient-to-r from-orange-500 to-red-500 text-white hover:shadow-orange-500/30'
-                        }`}
-                    >
-                        {isRecording ? <CircleStop size={24} className="animate-pulse" /> : <Mic size={24} />}
-                        <span>{isRecording ? t.stopRecording : t.startRecording}</span>
+            <div className="p-8 bg-white/80 backdrop-blur-2xl border-t border-orange-100 shadow-[0_-10px_40px_rgba(0,0,0,0.02)]">
+                <div className="flex gap-4 items-end max-w-4xl mx-auto">
+                    <textarea 
+                        value={inputText}
+                        onChange={(e) => setInputText(e.target.value)}
+                        className="flex-1 bg-orange-50/50 border border-orange-100 rounded-[2.2rem] p-6 text-base focus:ring-2 focus:ring-orange-200 outline-none h-20 resize-none transition-all"
+                        placeholder={isRTL ? "أفرغ ما بقلبك، سأستمع لك..." : "Release your heart, I am listening..."}
+                    />
+                    <button onClick={handleSend} disabled={!inputText.trim() || isStreaming} className="w-20 h-20 bg-orange-600 text-white rounded-[1.8rem] shadow-2xl active:scale-90 transition-all disabled:opacity-50 shadow-orange-500/30 flex items-center justify-center">
+                        <Send size={28} className={isRTL ? 'rotate-180' : ''} />
                     </button>
-                ) : (
-                    <div className="flex items-end gap-2">
-                        <textarea
-                            value={inputText}
-                            onChange={(e) => setInputText(e.target.value)}
-                            placeholder={t.fadfadaPlaceholder}
-                            className="flex-1 bg-white border border-gray-200 rounded-[1.5rem] p-4 max-h-32 min-h-[56px] resize-none focus:ring-2 focus:ring-orange-200 outline-none text-gray-800 placeholder-gray-400 shadow-inner"
-                            rows={1}
-                        />
-                        <button 
-                            onClick={handleSendMessage}
-                            disabled={!inputText.trim() || isStreaming}
-                            className="p-4 bg-gradient-to-br from-orange-500 to-red-500 text-white rounded-full shadow-lg hover:shadow-orange-500/30 disabled:opacity-50 transition-all active:scale-90 flex-shrink-0"
-                        >
-                            <Send size={20} className={isRTL ? 'mr-0.5' : 'ml-0.5'} />
-                        </button>
-                    </div>
-                )}
+                </div>
             </div>
         )}
     </div>

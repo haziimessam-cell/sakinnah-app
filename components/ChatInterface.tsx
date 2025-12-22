@@ -1,119 +1,107 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Message, Role, Category, Language, CognitiveNode } from '../types';
-import { sendMessageWithScientificLogic } from '../services/geminiService';
-import { memoryService } from '../services/memoryService';
+import { User, Message, Role, Category, Language, ViewStateName } from '../types';
+import { sendMessageStreamToGemini, getInitialAISalutation } from '../services/geminiService';
+import { translations } from '../translations';
 import ChatInput from './ChatInput';
 import ChatMessage from './ChatMessage';
-import { ArrowLeft, ArrowRight, Brain, Search, Info, ExternalLink, Microscope } from 'lucide-react';
-import { translations } from '../translations';
+import { ArrowLeft, ArrowRight, Activity, Info, PhoneCall, StopCircle } from 'lucide-react';
 
 interface Props {
   user: User;
   category: Category;
   language: Language;
   onBack: () => void;
-  onOpenCanvas: (nodes: CognitiveNode[]) => void;
-  onTriggerAppTool: (toolName: string) => void;
-  onUpdateTheme: (sentiment: string) => void;
+  onNavigate: (view: ViewStateName) => void;
 }
 
-const ChatInterface: React.FC<Props> = ({ user, category, language, onBack, onOpenCanvas, onTriggerAppTool, onUpdateTheme }) => {
+const ChatInterface: React.FC<Props> = ({ user, category, language, onBack, onNavigate }) => {
   const t = translations[language] as any;
   const isRTL = language === 'ar';
-  
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
-  const [groundingSources, setGroundingSources] = useState<any[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleSendMessage = async () => {
-    if (!inputText.trim()) return;
+  // التأثير المسؤول عن جعل الـ AI يبدأ الحوار
+  useEffect(() => {
+    const initiateAI = async () => {
+      setIsStreaming(true);
+      const greeting = await getInitialAISalutation(category.id, language, `The user is in the ${category.id} wing.`);
+      const aiMsg: Message = { id: Date.now().toString(), role: Role.MODEL, text: greeting, timestamp: new Date() };
+      setMessages([aiMsg]);
+      setIsStreaming(false);
+    };
+    initiateAI();
+  }, [category.id, language]);
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isStreaming]);
+
+  const handleSend = async () => {
+    if (!inputText.trim()) return;
     const userMsg = { id: Date.now().toString(), role: Role.USER, text: inputText, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
     setInputText('');
     setIsStreaming(true);
-    setGroundingSources([]);
 
     try {
-      const relevantContext = await memoryService.retrieveRelevantMemories(userMsg.text, user.username);
-      
-      // استخدام المنطق العلمي والبحث الجغرافي/المعلوماتي
-      const result = await sendMessageWithScientificLogic(userMsg.text, relevantContext, language);
-      
-      const aiMsg: Message = { 
-        id: (Date.now() + 1).toString(), 
-        role: Role.MODEL, 
-        text: result.text || "", 
-        timestamp: new Date() 
-      };
-      
-      setMessages(prev => [...prev, aiMsg]);
-      setGroundingSources(result.sources || []);
-      
-      memoryService.extractAndSaveMemory(userMsg.text + " " + aiMsg.text, user.username);
-
-    } catch (e) {
-        console.error(e);
-    } finally {
-      setIsStreaming(false);
-    }
+        const stream = sendMessageStreamToGemini(inputText, language);
+        let aiFullText = "";
+        const aiId = (Date.now() + 1).toString();
+        setMessages(prev => [...prev, { id: aiId, role: Role.MODEL, text: "", timestamp: new Date() }]);
+        
+        for await (const chunk of stream) {
+            aiFullText += chunk;
+            setMessages(prev => prev.map(m => m.id === aiId ? { ...m, text: aiFullText } : m));
+        }
+    } catch (e) { console.error(e); } finally { setIsStreaming(false); }
   };
 
   return (
-    <div className="h-full flex flex-col animate-fadeIn relative bg-slate-50">
-      <header className="px-4 py-4 bg-white border-b border-slate-100 flex justify-between items-center z-20 shadow-sm">
-        <div className="flex items-center gap-3">
-          <button onClick={onBack} className="p-2 bg-slate-50 rounded-xl text-slate-600">
-            {isRTL ? <ArrowRight size={20} /> : <ArrowLeft size={20} />}
+    <div className="h-full bg-white flex flex-col pt-safe pb-safe animate-fadeIn overflow-hidden">
+      <header className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white/80 backdrop-blur-xl sticky top-0 z-20">
+        <div className="flex items-center gap-5">
+          <button onClick={onBack} className="p-3 bg-slate-50 rounded-2xl text-slate-400 active:scale-90 transition-all">
+            {isRTL ? <ArrowRight size={22} /> : <ArrowLeft size={22} />}
           </button>
           <div>
-            <h1 className="text-slate-800 font-black text-sm">{t[`cat_${category.id}_title`]}</h1>
-            <p className="text-[9px] text-primary-600 font-bold flex items-center gap-1">
-                <Microscope size={10} /> {isRTL ? 'منطق إكلينيكي مفعل' : 'Clinical Logic Active'}
-            </p>
+            <h1 className="text-sm font-black text-slate-900 tracking-tight uppercase">{category.id === 'clinical' ? t.clinicalWing : category.id}</h1>
+            <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Live Session</span>
+            </div>
           </div>
         </div>
-        <button onClick={() => onOpenCanvas([])} className="p-2 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100">
-          <Brain size={20} />
+        <button onClick={() => onBack()} className="p-3 text-red-500 hover:bg-red-50 rounded-2xl transition-all flex items-center gap-2">
+            <StopCircle size={18} />
+            <span className="text-[10px] font-black uppercase tracking-widest">{t.endSession}</span>
         </button>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+      <div className="flex-1 overflow-y-auto no-scrollbar p-8 space-y-8 bg-slate-50/20">
         {messages.map(m => (
           <ChatMessage key={m.id} msg={m} language={language} isStreaming={false} isSpeaking={false} copiedId={null} onSpeak={()=>{}} onCopy={()=>{}} onBookmark={()=>{}} />
         ))}
-        
-        {groundingSources.length > 0 && (
-            <div className="bg-primary-50 border border-primary-100 p-4 rounded-2xl animate-slideUp">
-                <h4 className="text-[10px] font-black text-primary-700 uppercase mb-3 flex items-center gap-1 tracking-widest">
-                    <Search size={12} /> {isRTL ? 'المراجع والأدلة العلمية' : 'SCIENTIFIC EVIDENCE'}
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                    {groundingSources.map((source, idx) => (
-                        <a key={idx} href={source.web?.uri} target="_blank" className="text-[9px] bg-white px-3 py-1.5 rounded-lg border border-primary-200 text-primary-600 font-black flex items-center gap-1 hover:bg-primary-100 transition-all shadow-sm uppercase tracking-tighter">
-                            <ExternalLink size={10} /> {source.web?.title || 'Study Ref'}
-                        </a>
-                    ))}
-                </div>
+        {isStreaming && (
+            <div className="flex items-center gap-3 py-4 animate-pulse px-6">
+                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
+                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
+                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
+                <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest">{t.aiThinking}</span>
             </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      <ChatInput 
-        inputText={inputText} 
-        setInputText={setInputText} 
-        onSend={handleSendMessage} 
-        isListening={false} 
-        onToggleMic={()=>{}} 
-        isStreaming={isStreaming} 
-        language={language} 
-        t={t} 
-        isRTL={isRTL} 
-      />
+      <div className="p-8 bg-white border-t border-slate-100">
+        <ChatInput 
+          inputText={inputText} setInputText={setInputText} 
+          onSend={handleSend} isListening={false} onToggleMic={()=>{}} 
+          isStreaming={isStreaming} language={language} t={t} isRTL={isRTL} 
+        />
+      </div>
     </div>
   );
 };
