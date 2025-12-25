@@ -1,11 +1,10 @@
-
 import React from 'react';
-import { X, Sparkles, BookOpen, Activity } from 'lucide-react';
+import { X, Sparkles, BookOpen, Activity, Bookmark, ShieldCheck, ListChecks } from 'lucide-react';
 import { Category, Language } from '../types';
 import { translations } from '../translations';
 
 interface Props {
-  category: Category;
+  category: Category | { id: string, icon: string, color: string };
   onClose: () => void;
   language: Language;
 }
@@ -13,31 +12,21 @@ interface Props {
 const CategoryInfoModal: React.FC<Props> = ({ category, onClose, language }) => {
   const t = translations[language] as any;
   const isRTL = language === 'ar';
-  const title = t[`cat_${category.id}_title`] || category.id;
-  const desc = t[`cat_${category.id}_desc`] || '';
   
-  // Use specific science description if available, otherwise fallback to generic based on language
-  const science = t[`cat_${category.id}_science`] || (language === 'ar' 
-    ? 'يعتمد هذا القسم على بروتوكولات العلاج المعرفي السلوكي (CBT) وتقنيات اليقظة الذهنية المعتمدة عالمياً.' 
-    : 'This section utilizes Cognitive Behavioral Therapy (CBT) protocols and globally recognized mindfulness techniques.');
+  const id = category.id;
+  const title = t[id] || id;
+  const description = t[`cat_${id}_desc`] || t[`${id}_DESC`] || '';
+  const references = t[`cat_${id}_refs`] || '';
+  const methods = t[`cat_${id}_methods`] || '';
 
-  // Robust gradient generation using explicit classes to ensure Tailwind compiles them
   const getGradient = () => {
     if (category.color.includes('rose')) return 'from-rose-500 to-pink-600';
-    if (category.color.includes('red')) return 'from-red-500 to-rose-600';
     if (category.color.includes('teal')) return 'from-teal-500 to-emerald-600';
-    if (category.color.includes('cyan')) return 'from-cyan-500 to-blue-600';
-    if (category.color.includes('blue')) return 'from-sky-500 to-blue-600';
+    if (category.color.includes('indigo')) return 'from-indigo-500 to-blue-700';
+    if (category.color.includes('emerald')) return 'from-emerald-500 to-teal-600';
     if (category.color.includes('orange')) return 'from-orange-500 to-amber-600';
-    if (category.color.includes('violet') || category.color.includes('fuchsia')) return 'from-violet-500 to-fuchsia-600';
-    if (category.color.includes('purple')) return 'from-violet-500 to-purple-600';
-    if (category.color.includes('indigo')) return 'from-indigo-500 to-blue-700'; // For Sleep
-    if (category.color.includes('lime') || category.color.includes('green')) return 'from-lime-500 to-green-600';
-    if (category.color.includes('slate')) return 'from-slate-500 to-gray-700';
     return 'from-gray-500 to-gray-700';
   };
-
-  const gradientClass = getGradient();
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
@@ -46,56 +35,87 @@ const CategoryInfoModal: React.FC<Props> = ({ category, onClose, language }) => 
         onClick={onClose}
       ></div>
       
-      <div className="relative w-full max-w-md bg-white/80 backdrop-blur-2xl rounded-[2.5rem] shadow-2xl border border-white/50 overflow-hidden animate-scaleIn">
+      <div className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl border border-white/50 overflow-hidden animate-scaleIn max-h-[90vh] flex flex-col">
         
         {/* Artistic Header Background */}
-        <div className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-br ${gradientClass} opacity-20 pointer-events-none`}></div>
-        <div className="absolute top-[-20px] right-[-20px] w-40 h-40 bg-white/30 rounded-full blur-3xl"></div>
+        <div className={`absolute top-0 left-0 w-full h-32 bg-gradient-to-br ${getGradient()} opacity-10 pointer-events-none`}></div>
 
-        <button 
-          onClick={onClose}
-          className="absolute top-4 right-4 p-2 bg-white/50 hover:bg-white/80 rounded-full transition-all text-gray-600 z-10"
-        >
-          <X size={20} />
-        </button>
-
-        <div className="p-8 pt-10 relative z-10 flex flex-col items-center text-center">
-            <div className={`w-20 h-20 ${category.color} rounded-3xl flex items-center justify-center text-white shadow-xl shadow-gray-200 mb-6 transform rotate-3 border-4 border-white/50`}>
-                 <BookOpen size={32} />
-            </div>
-
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">{title}</h2>
-            
-            <div className="flex items-center gap-2 text-xs font-bold text-primary-600 bg-primary-50 px-3 py-1 rounded-full mb-6 border border-primary-100">
-                <Activity size={12} />
-                <span>{language === 'ar' ? 'الهدف والمنهجية' : 'Purpose & Methodology'}</span>
-            </div>
-
-            <p className="text-gray-600 leading-relaxed text-sm mb-8 font-medium">
-                {desc}
-            </p>
-
-            <div className="w-full bg-white/60 rounded-2xl p-4 border border-white/60 text-start flex gap-3 shadow-sm">
-                <div className="mt-1">
-                    <Sparkles size={18} className="text-teal-600" />
+        <header className="px-8 pt-8 pb-4 flex items-center justify-between z-10 sticky top-0 bg-white/80 backdrop-blur-sm">
+            <div className="flex items-center gap-4">
+                <div className={`w-12 h-12 ${category.color} rounded-2xl flex items-center justify-center text-white shadow-lg`}>
+                    <ShieldCheck size={24} />
                 </div>
                 <div>
-                    <h4 className="text-xs font-bold text-gray-800 uppercase mb-1">
-                        {language === 'ar' ? 'الأساس العلمي' : 'Scientific Basis'}
-                    </h4>
-                    <p className="text-xs text-gray-500 leading-relaxed">
-                        {science}
-                    </p>
+                    <h2 className="text-xl font-bold text-gray-800 leading-none mb-1">{title}</h2>
+                    <span className="text-[10px] font-black text-primary-600 uppercase tracking-widest">{t.activeProtocol}</span>
                 </div>
             </div>
-            
+            <button onClick={onClose} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-all text-gray-600">
+              <X size={20} />
+            </button>
+        </header>
+
+        <div className="flex-1 overflow-y-auto no-scrollbar p-8 pt-4 space-y-8">
+            {/* Overview */}
+            <section className="space-y-3">
+                <h3 className="flex items-center gap-2 text-xs font-black text-gray-400 uppercase tracking-widest">
+                    <Activity size={14} className="text-primary-500" />
+                    {t.clinicalOverview}
+                </h3>
+                <p className="text-gray-600 leading-relaxed text-sm font-medium bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                    {description}
+                </p>
+            </section>
+
+            {/* Methods */}
+            {methods && (
+                <section className="space-y-3">
+                    <h3 className="flex items-center gap-2 text-xs font-black text-gray-400 uppercase tracking-widest">
+                        <ListChecks size={14} className="text-emerald-500" />
+                        {t.methods}
+                    </h3>
+                    <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100">
+                        <pre className="text-xs text-emerald-800 leading-relaxed font-medium whitespace-pre-wrap font-sans">
+                            {methods}
+                        </pre>
+                    </div>
+                </section>
+            )}
+
+            {/* References */}
+            {references && (
+                <section className="space-y-3">
+                    <h3 className="flex items-center gap-2 text-xs font-black text-gray-400 uppercase tracking-widest">
+                        <Bookmark size={14} className="text-indigo-500" />
+                        {t.references}
+                    </h3>
+                    <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
+                        <pre className="text-xs text-indigo-800 leading-relaxed font-medium whitespace-pre-wrap font-sans">
+                            {references}
+                        </pre>
+                    </div>
+                </section>
+            )}
+
+            {/* Scientific Footer Badge */}
+            <div className="bg-primary-50 rounded-2xl p-4 border border-primary-100 flex gap-4 items-start">
+                <Sparkles size={20} className="text-primary-600 mt-0.5" />
+                <p className="text-[11px] text-primary-800 leading-relaxed font-bold italic">
+                    {language === 'ar' 
+                      ? 'يعتمد هذا البروتوكول على أحدث الأبحاث السريرية المذكورة أعلاه لضمان تقديم الرعاية النفسية الأكثر فعالية.' 
+                      : 'This protocol is built upon the latest clinical research listed above to ensure the most effective psychological care.'}
+                </p>
+            </div>
+        </div>
+
+        <footer className="p-8 pt-4 border-t border-gray-100 bg-gray-50/50">
             <button 
               onClick={onClose}
-              className="mt-8 w-full py-3.5 bg-gray-900 text-white rounded-2xl font-bold shadow-lg hover:scale-[1.02] active:scale-95 transition-all"
+              className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold shadow-lg hover:scale-[1.01] active:scale-95 transition-all text-sm uppercase tracking-widest"
             >
                 {language === 'ar' ? 'فهمت' : 'Got it'}
             </button>
-        </div>
+        </footer>
       </div>
     </div>
   );

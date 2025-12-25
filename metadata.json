@@ -4,5 +4,11 @@
   "requestFramePermissions": [
     "microphone",
     "camera"
+  ],
+  "permissions": [
+    "android.permission.INTERNET",
+    "android.permission.VIBRATE",
+    "android.permission.RECORD_AUDIO",
+    "android.permission.MODIFY_AUDIO_SETTINGS"
   ]
 }

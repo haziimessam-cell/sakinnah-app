@@ -1,7 +1,8 @@
 
 export enum Role {
   USER = 'user',
-  MODEL = 'model'
+  MODEL = 'model',
+  PARTNER = 'partner'
 }
 
 export interface Message {
@@ -9,64 +10,111 @@ export interface Message {
   role: Role;
   text: string;
   timestamp: Date;
-  isBookmarked?: boolean;
+  senderName?: string;
 }
 
-export interface AppNotification {
-  id: string;
-  type: 'insight' | 'reminder' | 'garden' | 'alert';
-  titleAr: string;
-  titleEn: string;
-  bodyAr: string;
-  bodyEn: string;
-  timestamp: Date;
-  isRead: boolean;
-  actionView?: ViewStateName;
-}
-
-export interface CognitiveNode {
-    id: string;
-    label: string;
-    type: 'thought' | 'belief' | 'distortion';
-    description: string;
-    x: number;
-    y: number;
-}
-
-export interface SandboxScenario {
-    id: string;
-    titleAr: string;
-    titleEn: string;
-    icon: string;
-    descriptionAr: string;
-    descriptionEn: string;
-    difficulty: 'easy' | 'medium' | 'hard';
-    durationMinutes: number;
-    personaAr: string;
-    personaEn: string;
-}
-
-export interface ViewState {
-    type: 'LOGIN' | 'HOME' | 'CHAT' | 'DISCLAIMER' | 'PROFILE' | 'SETTINGS' | 'HELP' | 'BREATHING' | 'GARDEN' | 'DREAM' | 'GROUNDING' | 'BOOKING' | 'SLEEP_TOOL' | 'SUBSCRIPTION' | 'JOURNAL' | 'EMERGENCY_CHAT' | 'FADFADA' | 'ASSESSMENT' | 'PLAN' | 'CBT_CANVAS' | 'SOCIAL_SANDBOX' | 'RELATIONSHIP_HUB' | 'EMPATHY_TRANSLATOR' | 'ATTACHMENT_MAPPER' | 'CO_REGULATOR' | 'MEDIATOR' | 'SLEEP_SANCTUARY' | 'NOTIFICATIONS' | 'MODE_SELECTION' | 'VOICE_SESSION' | 'WELLNESS_SANCTUARY';
-}
+export type Gender = 'male' | 'female';
+export type OutputMode = 'text' | 'audio';
 
 export interface User {
+  id: string; 
   name: string;
+  childName?: string;
+  childAge?: string;
+  childCondition?: 'ASD' | 'ADHD';
   email: string;
   age: string;
-  gender: 'male' | 'female';
+  gender: Gender;
   username: string;
-  partner?: string;
   registrationDate: string;
   isSubscribed?: boolean;
-  pinCode?: string;
-  voiceSpeed?: number;
-  emergencyContact?: string;
+  partnerId?: string;
+  partnerName?: string;
+  pendingInviteFrom?: string;
+  pin?: string;
+  preferredOutput?: OutputMode;
 }
 
 export type Language = 'ar' | 'en';
-export type ViewStateName = ViewState['type'];
-export type Gender = User['gender'];
+
+export type TherapyCategory = 
+  | 'DEPRESSION' 
+  | 'ANXIETY' 
+  | 'OCD' 
+  | 'BIPOLAR' 
+  | 'SOCIAL_PHOBIA';
+
+export type ViewStateName = 
+  | 'LOGIN' 
+  | 'HOME' 
+  | 'THERAPY' 
+  | 'FADFADA' 
+  | 'DREAM' 
+  | 'RELATIONSHIPS' 
+  | 'JOINT_SESSION'
+  | 'PARTNER_MANAGER' 
+  | 'SLEEP' 
+  | 'STORYTELLING'
+  | 'CONFRONTATION' 
+  | 'DISTINCT_MINDS'
+  | 'AUTISM'
+  | 'ADHD'
+  | 'SETTINGS' 
+  | 'PROFILE'
+  | 'ROUTINE_HERO'
+  | 'BREATHING'
+  | 'MEDIATOR'
+  | 'EMPATHY_TRANSLATOR'
+  | 'ATTACHMENT_MAPPER'
+  | 'SOCIAL_SANDBOX';
+
+export interface Category {
+  id: ViewStateName;
+  icon: string;
+  color: string;
+}
+
+export interface CaseReportData {
+  summary: string;
+  behavioralGoals: string[];
+  practicalSteps: string[];
+  primaryStrategy: string;
+  nextSessionFocus: string;
+  timestamp: string;
+  category: string;
+}
+
+export interface MonthlyClinicalReport {
+  id: string;
+  month: string;
+  conditionSummary: string;
+  progressAchieved: string;
+  attentionRequired: string;
+  homeRecommendations: string[];
+  schoolStrategies: string[];
+  timestamp: string;
+  type: 'MONTHLY';
+  category?: string;
+}
+
+export interface SessionSummary {
+  id: string;
+  category: string;
+  date: string;
+  observations: string[];
+  symptoms: string[];
+  recommendations: string[];
+  type: 'SESSION';
+}
+
+export interface BookedSession {
+  id: string;
+  date: Date | string;
+  time: string;
+  type: 'ai_guided' | 'human';
+  status: 'upcoming' | 'completed';
+  categoryId?: string;
+}
 
 export interface Question {
   id: string;
@@ -76,62 +124,34 @@ export interface Question {
   optionsEn: string[];
 }
 
-export interface Achievement {
-  id: string;
-  titleAr: string;
-  titleEn: string;
-  icon: string;
-  unlocked: boolean;
-}
-
-export interface MonthlyReport {
-  id: string;
-  month: string;
-  summaryAr: string;
-  summaryEn: string;
-}
-
-export interface Category {
-  id: string;
-  icon: string;
-  color: string;
-}
-
-export interface BookedSession {
-  id: string;
-  date: Date;
-  time: string;
-  type: string;
-  status: 'upcoming' | 'completed' | 'cancelled';
-  categoryId?: string;
-}
-
-export interface TherapyPlan {
-  category: string;
-  severity: string;
-  score: number;
-}
-
 export interface JournalEntry {
   id: string;
-  date: Date | string;
+  date: Date;
   text: string;
-  tags?: string[];
+  tags: string[];
   sentiment: 'positive' | 'neutral' | 'negative';
 }
 
-export interface SavedMessage {
+export interface AppNotification {
   id: string;
-  role: Role;
-  text: string;
+  type: 'insight' | 'garden' | 'routine' | 'sensory' | 'achievement' | 'alert' | 'generic';
+  titleAr: string;
+  titleEn: string;
+  bodyAr: string;
+  bodyEn: string;
   timestamp: Date;
+  isRead: boolean;
+  priority: 'low' | 'medium' | 'high';
+  actionView?: ViewStateName;
 }
 
-export interface SessionSummary {
+export interface ClinicalDocument {
   id: string;
   category: string;
-  points: string[];
-  date: string;
+  tags: string[];
+  contentAr: string;
+  contentEn: string;
+  source: string;
 }
 
 export interface Memory {
@@ -143,11 +163,22 @@ export interface Memory {
   embedding?: number[];
 }
 
-export interface ClinicalDocument {
+export interface CognitiveNode {
   id: string;
-  category: string;
-  tags: string[];
-  contentAr: string;
-  contentEn: string;
-  source: string;
+  x: number;
+  y: number;
+  label: string;
+  type: 'thought' | 'distortion' | 'belief';
+  description: string;
+}
+
+export interface SandboxScenario {
+  id: string;
+  titleAr: string;
+  titleEn: string;
+  personaAr: string;
+  personaEn: string;
+  descriptionAr: string;
+  descriptionEn: string;
+  icon: string;
 }

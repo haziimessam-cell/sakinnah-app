@@ -1,5 +1,4 @@
 
-
 import React, { useRef, useEffect } from 'react';
 import { Send, Mic, MicOff, CircleStop } from 'lucide-react';
 import { Language } from '../types';
@@ -17,76 +16,43 @@ interface Props {
 }
 
 const ChatInput: React.FC<Props> = ({ 
-  inputText, 
-  setInputText, 
-  onSend, 
-  isListening, 
-  onToggleMic, 
-  isStreaming, 
-  language,
-  t,
-  isRTL
+  inputText, setInputText, onSend, isListening, onToggleMic, isStreaming, language, t, isRTL
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'; // Reset height
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`; // Set new height capped at 120px
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
     }
   }, [inputText]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      onSend();
-    }
-  };
-
   return (
-    <div className="bg-white/40 backdrop-blur-md p-3 border-t border-white/20 pb-safe transition-all duration-300">
-      <div className="flex items-end gap-2 max-w-4xl mx-auto">
-        <button 
-          onClick={onToggleMic} 
-          className={`p-3 rounded-full transition-all duration-300 flex-shrink-0 h-12 w-12 flex items-center justify-center shadow-sm ${
-            isListening 
-              ? 'bg-red-500 text-white animate-pulse' 
-              : 'bg-white/60 text-gray-500 hover:bg-white border border-white/40'
-          }`}
-        >
-          {isListening ? <MicOff size={20} /> : <Mic size={20} />}
+    <div className="flex items-end gap-2 max-w-4xl mx-auto">
+      <div className="flex-1 bg-m3-surfaceVariant rounded-[28px] flex items-end px-2 py-1 min-h-[56px] border border-transparent focus-within:border-m3-primary/30">
+        <button onClick={onToggleMic} className={`p-3 rounded-full ${isListening ? 'text-m3-error animate-pulse' : 'text-m3-onSurfaceVariant'}`}>
+          {isListening ? <MicOff size={24} /> : <Mic size={24} />}
         </button>
-        
-        <div className="flex-1 bg-white/60 backdrop-blur-md rounded-[1.5rem] border border-white/40 focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-100 transition-all shadow-inner relative overflow-hidden">
-          <textarea
-            ref={textareaRef}
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={isListening ? t.inputListening : t.inputPlaceholder}
-            className="w-full bg-transparent border-none focus:ring-0 p-3.5 max-h-[120px] min-h-[48px] resize-none text-gray-800 placeholder-gray-500 block leading-relaxed"
-            rows={1}
-            style={{ overflowY: inputText.length > 100 ? 'auto' : 'hidden' }}
-          />
-        </div>
-        
-        <button 
-          onClick={() => onSend()} 
-          disabled={(isStreaming) || (!inputText.trim() && !isStreaming)} 
-          className={`p-3 rounded-full flex items-center justify-center transition-all h-12 w-12 flex-shrink-0 shadow-lg border border-white/20 transform active:scale-90 duration-200 ${
-            inputText.trim() && !isStreaming 
-              ? 'bg-gradient-to-r from-primary-600 to-primary-500 text-white hover:shadow-primary-500/30' 
-              : 'bg-gray-200/50 text-gray-400 cursor-not-allowed'
-          }`}
-        >
-          {isStreaming ? (
-            <CircleStop size={20} className="animate-pulse text-primary-600" />
-          ) : (
-            <Send size={20} className={isRTL && inputText.trim() ? 'mr-0.5' : 'ml-0.5'} />
-          )} 
-        </button>
+        <textarea
+          ref={textareaRef}
+          value={inputText}
+          onChange={(e) => setInputText(e.target.value)}
+          placeholder={isRTL ? 'رسالة...' : 'Message...'}
+          className="flex-1 bg-transparent border-none focus:ring-0 p-3 max-h-[120px] min-h-[48px] resize-none text-m3-onSurface text-base"
+          rows={1}
+        />
       </div>
+      
+      <button 
+        onClick={onSend} 
+        disabled={isStreaming || !inputText.trim()}
+        className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all active:scale-95
+          ${inputText.trim() && !isStreaming 
+            ? 'bg-m3-primary text-m3-onPrimary' 
+            : 'bg-m3-surfaceVariant text-m3-onSurfaceVariant opacity-50'}`}
+      >
+        {isStreaming ? <CircleStop size={24} className="animate-pulse" /> : <Send size={24} className={isRTL ? 'rotate-180' : ''} />} 
+      </button>
     </div>
   );
 };

@@ -1,18 +1,20 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { Language } from '../types';
 import { translations } from '../translations';
-import { Crown, CircleCheck, ShieldCheck, Heart, MapPin, Star } from 'lucide-react';
+import { Crown, CircleCheck, ShieldCheck, Heart, MapPin, Sparkles, X, Lock } from 'lucide-react';
 import { geoService } from '../services/geoService';
 import { syncService } from '../services/syncService';
+import { triggerHaptic, triggerSuccessHaptic } from '../services/hapticService';
 
 interface Props {
   language: Language;
   onSubscribe: () => void;
+  onClose?: () => void;
+  isTrialExpired?: boolean;
 }
 
-const SubscriptionScreen: React.FC<Props> = ({ language, onSubscribe }) => {
+const SubscriptionScreen: React.FC<Props> = ({ language, onSubscribe, onClose, isTrialExpired }) => {
   const t = translations[language] as any;
   const isRTL = language === 'ar';
   
@@ -23,8 +25,8 @@ const SubscriptionScreen: React.FC<Props> = ({ language, onSubscribe }) => {
   const [selectedPlan, setSelectedPlan] = useState<'daily' | 'monthly' | 'quarterly' | 'yearly'>('monthly');
 
   const PRICING = {
-      EGP: { daily: 30, monthly: 200, quarterly: 450, yearly: 1300 },
-      USD: { daily: 1, monthly: 7, quarterly: 18, yearly: 70 }
+      EGP: { daily: 30, monthly: 200, quarterly: 500, yearly: 2000 },
+      USD: { daily: 1, monthly: 10, quarterly: 25, yearly: 100 }
   };
 
   useEffect(() => {
@@ -37,6 +39,7 @@ const SubscriptionScreen: React.FC<Props> = ({ language, onSubscribe }) => {
               setCurrency('EGP');
           } else {
               setCurrency('USD');
+              if (selectedPlan === 'daily') setSelectedPlan('monthly');
           }
           setInitLoading(false);
       };
@@ -46,123 +49,125 @@ const SubscriptionScreen: React.FC<Props> = ({ language, onSubscribe }) => {
 
   const handlePay = async () => {
       setLoading(true);
-      
-      // 1. Simulate Payment Gateway (Stripe/Paymob would go here)
-      setTimeout(async () => {
-          // 2. SECURE UPGRADE: Call server to upgrade (Anti-Hack)
-          const success = await syncService.upgradeSubscription();
-          
-          if (success) {
-              onSubscribe();
-          } else {
-              alert(t.activationError);
-              setLoading(false);
-          }
-      }, 2000);
+      triggerHaptic();
+      setTimeout(() => {
+          alert(t.gatewayComingSoon);
+          setLoading(false);
+      }, 1000);
   };
 
-  const getPlanPrice = (plan: 'daily' | 'monthly' | 'quarterly' | 'yearly') => {
-      return PRICING[currency][plan];
-  };
+  const getCurrencySymbol = () => currency === 'EGP' ? (isRTL ? 'ج.م' : 'EGP') : '$';
 
-  const getCurrencySymbol = () => currency === 'EGP' ? 'EGP' : '$';
+  const plans = currency === 'EGP' 
+    ? [
+        { id: 'daily', title: t.plan_daily, price: PRICING.EGP.daily },
+        { id: 'monthly', title: t.plan_monthly, price: PRICING.EGP.monthly, badge: t.mostPopular, badgeColor: 'bg-m3-primary' },
+        { id: 'quarterly', title: t.plan_quarterly, price: PRICING.EGP.quarterly },
+        { id: 'yearly', title: t.plan_yearly, price: PRICING.EGP.yearly, badge: t.bestValue, badgeColor: 'bg-amber-500' },
+      ]
+    : [
+        { id: 'monthly', title: t.plan_monthly, price: PRICING.USD.monthly, badge: t.mostPopular, badgeColor: 'bg-m3-primary' },
+        { id: 'quarterly', title: t.plan_quarterly, price: PRICING.USD.quarterly },
+        { id: 'yearly', title: t.plan_yearly, price: PRICING.USD.yearly, badge: t.bestValue, badgeColor: 'bg-amber-500' },
+      ];
 
   return (
-    <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col items-center justify-center p-6 animate-fadeIn overflow-hidden">
+    <div className="fixed inset-0 z-[100] bg-[#0A0C10] flex flex-col items-center justify-center p-6 animate-m3-fade-in overflow-hidden">
         
-        {/* Ambient Background */}
-        <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%] bg-indigo-500/20 rounded-full blur-[120px] animate-pulse pointer-events-none"></div>
-        <div className="absolute bottom-[-20%] right-[-20%] w-[80%] h-[80%] bg-teal-500/20 rounded-full blur-[120px] animate-pulse pointer-events-none" style={{animationDelay:'2s'}}></div>
+        <div className="absolute top-[-20%] left-[-20%] w-[100%] h-[100%] bg-m3-primary/10 rounded-full blur-[180px] animate-pulse pointer-events-none"></div>
+        <div className="absolute bottom-[-20%] right-[-20%] w-[100%] h-[100%] bg-teal-500/5 rounded-full blur-[180px] animate-pulse pointer-events-none" style={{animationDelay:'2s'}}></div>
 
-        <div className="w-full max-w-lg bg-white/10 backdrop-blur-2xl rounded-[2.5rem] border border-white/20 shadow-2xl relative overflow-hidden flex flex-col items-center p-6 text-center text-white h-[90vh] md:h-auto overflow-y-auto no-scrollbar">
+        <div className="w-full max-w-lg bg-white/5 backdrop-blur-3xl rounded-m3-xl border border-white/10 shadow-2xl relative overflow-hidden flex flex-col items-center p-8 text-center text-white max-h-[90vh] overflow-y-auto no-scrollbar">
             
-            {/* Crown Icon */}
-            <div className="w-16 h-16 bg-gradient-to-br from-amber-300 to-yellow-600 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/40 mb-4 animate-float flex-shrink-0">
-                <Crown size={32} className="text-white drop-shadow-md" />
+            {onClose && !isTrialExpired && (
+                <button onClick={onClose} className="absolute top-6 right-6 p-2 text-white/20 hover:text-white transition-all">
+                    <X size={24} />
+                </button>
+            )}
+
+            <div className="w-20 h-20 bg-gradient-to-br from-amber-200 to-yellow-600 rounded-m3-lg flex items-center justify-center shadow-2xl shadow-amber-500/20 mb-8 animate-float shrink-0">
+                <Crown size={42} className="text-white drop-shadow-md" strokeWidth={2.5} />
             </div>
 
-            <h1 className="text-xl font-bold mb-2">{t.subTitle}</h1>
-            <p className="text-indigo-200 text-xs leading-relaxed mb-6 max-w-xs">{t.subDesc}</p>
+            <h1 className="text-3xl font-black mb-4 tracking-tight font-arabic">{t.subTitle}</h1>
+            <p className="text-indigo-100/60 text-sm leading-relaxed mb-10 max-w-xs mx-auto font-medium">{t.subDesc}</p>
+
+            {isTrialExpired && (
+                <div className="mb-8 px-6 py-4 bg-red-500/10 border border-red-500/20 rounded-m3-lg flex items-center gap-3 text-red-400 text-sm font-black uppercase tracking-widest">
+                    <Lock size={18} />
+                    <span>{t.trialEnded}</span>
+                </div>
+            )}
 
             {initLoading ? (
-                <div className="h-40 flex items-center justify-center w-full">
-                    <div className="w-8 h-8 border-2 border-indigo-300 border-t-transparent rounded-full animate-spin"></div>
+                <div className="h-64 flex flex-col items-center justify-center w-full gap-5">
+                    <div className="w-12 h-12 border-4 border-m3-primary border-t-transparent rounded-full animate-spin"></div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.5em] text-m3-primary/50">Securing Region...</p>
                 </div>
             ) : (
-                <div className="w-full grid grid-cols-2 gap-3 mb-6">
-                    {/* Plan Cards */}
-                    {[
-                        { id: 'daily', title: t.plan_daily, price: getPlanPrice('daily') },
-                        { id: 'monthly', title: t.plan_monthly, price: getPlanPrice('monthly'), badge: t.mostPopular, badgeColor: 'bg-indigo-500' },
-                        { id: 'quarterly', title: t.plan_quarterly, price: getPlanPrice('quarterly') },
-                        { id: 'yearly', title: t.plan_yearly, price: getPlanPrice('yearly'), badge: t.bestValue, badgeColor: 'bg-amber-500' },
-                    ].map((plan) => (
+                <div className="w-full space-y-4 mb-10">
+                    {plans.map((plan) => (
                         <button
                             key={plan.id}
                             onClick={() => setSelectedPlan(plan.id as any)}
-                            className={`relative p-4 rounded-2xl border transition-all ${
-                                selectedPlan === plan.id 
-                                ? 'bg-white/20 border-teal-400 shadow-lg scale-[1.02]' 
-                                : 'bg-white/5 border-white/10 hover:bg-white/10'
-                            }`}
+                            className={`relative w-full p-6 rounded-m3-lg border transition-all flex items-center justify-between group
+                            ${selectedPlan === plan.id 
+                                ? 'bg-white/10 border-m3-primary shadow-2xl scale-[1.02]' 
+                                : 'bg-white/5 border-white/5 hover:bg-white/10'}`}
                         >
-                            {plan.badge && (
-                                <div className={`absolute -top-2 left-1/2 -translate-x-1/2 ${plan.badgeColor} text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-sm whitespace-nowrap`}>
-                                    {plan.badge}
+                            <div className="flex items-center gap-5">
+                                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${selectedPlan === plan.id ? 'border-m3-primary bg-m3-primary' : 'border-white/20'}`}>
+                                    {selectedPlan === plan.id && <CircleCheck size={14} className="text-white" />}
                                 </div>
-                            )}
-                            <div className="text-xs text-indigo-200 font-medium mb-1">{plan.title}</div>
-                            <div className="text-xl font-bold flex items-center justify-center gap-1">
+                                <div className="text-start">
+                                    <div className="text-[15px] font-bold tracking-tight">{plan.title}</div>
+                                    {plan.badge && (
+                                        <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${plan.id === 'yearly' ? 'text-amber-400' : 'text-m3-primary'}`}>
+                                            {plan.badge}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="text-2xl font-black tabular-nums">
                                 {plan.price}
-                                <span className="text-[10px] font-normal opacity-70">{getCurrencySymbol()}</span>
+                                <span className="text-[11px] font-bold opacity-30 ml-2 uppercase">{getCurrencySymbol()}</span>
                             </div>
                         </button>
                     ))}
                 </div>
             )}
 
-            {userCountry && (
-                <div className="flex items-center justify-center gap-1 mb-4 text-[10px] text-indigo-300 opacity-60">
-                    <MapPin size={10} />
-                    <span>{userCountry} Localized Pricing</span>
+            <div className="space-y-5 text-start text-xs w-full mb-12 px-4">
+                <div className="flex items-center gap-5 text-indigo-100/70">
+                    <div className="w-10 h-10 bg-white/5 rounded-m3-md flex items-center justify-center border border-white/5"><Sparkles size={18} className="text-m3-primary" /></div>
+                    <span className="font-bold text-sm">{t.unlimitedAI}</span>
                 </div>
-            )}
-
-            <div className="space-y-2 text-start text-xs px-4 mb-6 w-full max-w-xs mx-auto">
-                <div className="flex items-center gap-3 opacity-90">
-                    <CircleCheck size={14} className="text-green-400" />
-                    <span>{t.unlimitedAI}</span>
-                </div>
-                <div className="flex items-center gap-3 opacity-90">
-                    <CircleCheck size={14} className="text-green-400" />
-                    <span>{t.allTools}</span>
-                </div>
-                <div className="flex items-center gap-3 opacity-90">
-                    <CircleCheck size={14} className="text-green-400" />
-                    <span>{t.privacyAdFree}</span>
+                <div className="flex items-center gap-5 text-indigo-100/70">
+                    <div className="w-10 h-10 bg-white/5 rounded-m3-md flex items-center justify-center border border-white/5"><ShieldCheck size={18} className="text-m3-primary" /></div>
+                    <span className="font-bold text-sm">{t.allTools}</span>
                 </div>
             </div>
 
-            <button 
-                onClick={handlePay}
-                disabled={loading || initLoading}
-                className="w-full py-4 bg-gradient-to-r from-teal-500 to-blue-600 rounded-2xl font-bold text-lg shadow-lg hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed mt-auto"
-            >
-                {loading ? (
-                    <div className="w-6 h-6 border-2 border-white rounded-full border-t-transparent animate-spin"></div>
-                ) : (
-                    <>
-                        <Heart size={20} fill="currentColor" className="text-pink-300" />
-                        <span>{t.subButton}</span>
-                    </>
-                )}
-            </button>
-
-            <div className="mt-4 flex items-center gap-2 text-[10px] text-indigo-300/60">
-                <ShieldCheck size={12} />
-                <span>{t.subNote}</span>
+            <div className="w-full mt-auto">
+                <button 
+                    onClick={handlePay}
+                    disabled={loading || initLoading}
+                    className="w-full py-6 bg-white text-[#0A0C10] rounded-m3-full font-black text-lg shadow-2xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                >
+                    {loading ? (
+                        <div className="w-6 h-6 border-4 border-gray-900 rounded-full border-t-transparent animate-spin"></div>
+                    ) : (
+                        <>
+                            <Heart size={24} fill="currentColor" className="text-red-500" />
+                            <span className="uppercase tracking-widest">{t.subButton}</span>
+                        </>
+                    )}
+                </button>
+                <p className="mt-8 text-[10px] text-white/20 font-black uppercase tracking-[0.5em] flex items-center justify-center gap-3">
+                    <Lock size={12} />
+                    {t.subNote}
+                </p>
             </div>
-
         </div>
     </div>
   );
