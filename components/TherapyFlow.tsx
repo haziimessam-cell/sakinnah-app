@@ -159,7 +159,6 @@ const TherapyFlow: React.FC<Props> = ({ user, category, language, onBack, therap
            </div>
 
            <div className="grid grid-cols-1 gap-6">
-              {/* Symptoms */}
               <section className="space-y-3">
                   <h3 className="flex items-center gap-2 text-[11px] font-black text-m3-onSurfaceVariant/40 uppercase tracking-[0.25em] px-1">
                     <Info size={14} /> {t.symptomsLabel}
@@ -170,8 +169,6 @@ const TherapyFlow: React.FC<Props> = ({ user, category, language, onBack, therap
                     </div>
                   </div>
               </section>
-
-              {/* Methods */}
               <section className="space-y-3">
                   <h3 className="flex items-center gap-2 text-[11px] font-black text-m3-onSurfaceVariant/40 uppercase tracking-[0.25em] px-1">
                     <ListChecks size={14} /> {t.methodsLabel}
@@ -182,8 +179,6 @@ const TherapyFlow: React.FC<Props> = ({ user, category, language, onBack, therap
                     </div>
                   </div>
               </section>
-
-              {/* References */}
               <section className="space-y-3">
                   <h3 className="flex items-center gap-2 text-[11px] font-black text-m3-onSurfaceVariant/40 uppercase tracking-[0.25em] px-1">
                     <Bookmark size={14} /> {t.referencesLabel}
@@ -247,14 +242,14 @@ const TherapyFlow: React.FC<Props> = ({ user, category, language, onBack, therap
         <main className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar pb-40">
            <div className="bg-white p-8 rounded-m3-xl shadow-soft border border-m3-outline/10 space-y-8">
               <div className="space-y-3">
-                <h3 className="text-[11px] font-black text-m3-primary uppercase tracking-[0.3em]">{isRTL ? 'ملخص الحالة الإكلينيكي' : 'CLINICAL SUMMARY'}</h3>
+                <h3 className="text-[11px] font-black text-m3-primary uppercase tracking-[0.3em]">{isRTL ? 'ملخص الحالة (غير تشخيصي)' : 'CASE SUMMARY (NON-DIAGNOSTIC)'}</h3>
                 <p className="text-m3-onSurface text-[16px] font-semibold leading-relaxed italic border-l-4 border-m3-primary pl-6 py-2">"{report?.summary}"</p>
               </div>
 
               <div className="space-y-6">
                 <section className="space-y-3">
                   <h3 className="flex items-center gap-2 text-[10px] font-black text-m3-onSurfaceVariant/50 uppercase tracking-[0.2em]">
-                    <Target size={14} className="text-m3-primary" /> {isRTL ? 'الأهداف السلوكية' : 'BEHAVIORAL GOALS'}
+                    <Target size={14} className="text-m3-primary" /> {isRTL ? 'أهداف سلوكية مقترحة' : 'BEHAVIORAL GOALS'}
                   </h3>
                   <div className="grid grid-cols-1 gap-2">
                     {report?.behavioralGoals.map((goal, idx) => (
@@ -286,7 +281,7 @@ const TherapyFlow: React.FC<Props> = ({ user, category, language, onBack, therap
                 </section>
 
                 <div className="p-4 bg-m3-surface border border-m3-outline/10 rounded-2xl">
-                   <p className="text-[10px] font-black text-m3-onSurfaceVariant/40 uppercase tracking-widest mb-1">{isRTL ? 'تركيز الجلسة القادمة' : 'NEXT SESSION FOCUS'}</p>
+                   <p className="text-[10px] font-black text-m3-onSurfaceVariant/40 uppercase tracking-widest mb-1">{isRTL ? 'محور الجلسة القادمة' : 'NEXT SESSION FOCUS'}</p>
                    <p className="text-sm font-bold text-m3-onSurface">{report?.nextSessionFocus}</p>
                 </div>
               </div>

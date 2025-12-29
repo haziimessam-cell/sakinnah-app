@@ -2,10 +2,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Message, Role, Category, Language, OutputMode } from '../types';
 import { sendMessageStreamToGemini, initializeChat, getInitialAISalutation, generateSessionSummary, generateSpeech } from '../services/geminiService';
+import { liveVoiceService } from '../services/liveVoiceService';
 import { translations } from '../translations';
 import ChatInput from './ChatInput';
 import ChatMessage from './ChatMessage';
-import { ArrowLeft, ArrowRight, ShieldCheck, Sparkles, Volume2, Mic, Play, Pause, LogOut, Loader2, MessageSquare, Headphones } from 'lucide-react';
+// Add Phone to the imports from lucide-react
+import { ArrowLeft, ArrowRight, ShieldCheck, Sparkles, Volume2, Mic, Play, Pause, LogOut, Loader2, MessageSquare, Headphones, X, VolumeX, MicOff, Phone } from 'lucide-react';
 import { triggerHaptic, triggerSuccessHaptic } from '../services/hapticService';
 
 interface Props {
@@ -27,21 +29,22 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack, ther
   const [isFinishing, setIsFinishing] = useState(false);
   
   const [outputMode, setOutputMode] = useState<OutputMode | null>(user.preferredOutput || null);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
+  const [sessionState, setSessionState] = useState<'idle' | 'listening' | 'speaking' | 'thinking'>('idle');
+  const [userVolume, setUserVolume] = useState(0);
+  const [transcript, setTranscript] = useState('');
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
   useEffect(() => {
-    if (outputMode) initSession();
+    if (outputMode === 'audio') {
+        startVoiceSession();
+    } else if (outputMode === 'text') {
+        initTextSession();
+    }
+    return () => liveVoiceService.stop();
   }, [outputMode]);
 
-  const initSession = async () => {
-    setIsStreaming(true);
-    
-    // Determine Persona Context based on category
+  const getPersonaInstruction = () => {
     let personaContext = 'Specialist Sakinnah';
     if (category.id === 'DISTINCT_MINDS' || category.id === 'AUTISM' || category.id === 'ADHD') {
         personaContext = 'Mama May';
@@ -61,56 +64,39 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack, ther
     if (category.id === 'DREAM') {
         baseInstruction += `\nPROTOCOL: Interpret dreams using psychological, emotional, and symbolic analysis. NO superstition, NO spiritual claims. Interpretation must be calm, grounded, and non-alarming.`;
     }
-
     if (category.id === 'CONFRONTATION') {
         baseInstruction += `\nPROTOCOL: Lead the session actively. Challenge distorted thinking gently but clearly using logical reasoning and emotional validation. NO motivational clichés.`;
     }
+    return baseInstruction;
+  };
 
-    if (category.id === 'DISTINCT_MINDS' || category.id === 'AUTISM' || category.id === 'ADHD') {
-        if (!user.childName) {
-            baseInstruction += `\nFIRST_SESSION_PROTOCOL: This is your FIRST interaction with this user. You MUST start by vocally and warmly asking for the child's name, age, and condition (ASD/ADHD) before any evaluation or treatment. This is mandatory.`;
-        } else {
-            baseInstruction += `\nCHILD_CONTEXT: Name: ${user.childName}, Age: ${user.childAge}, Condition: ${user.childCondition}. Use this information to tailor your guidance strictly using the scientific references.`;
+  const startVoiceSession = async () => {
+    setSessionState('thinking');
+    const instruction = getPersonaInstruction();
+    
+    await liveVoiceService.connect({
+        systemInstruction: instruction,
+        userGender: user.gender,
+        onTranscript: (text) => setTranscript(text),
+        onVolumeUpdate: (v) => setUserVolume(v),
+        onStateChange: (state) => setSessionState(state),
+        onError: (err) => {
+            console.error("Voice fail:", err);
+            setOutputMode('text');
         }
-    }
+    });
+  };
+
+  const initTextSession = async () => {
+    setIsStreaming(true);
+    const instruction = getPersonaInstruction();
+    await initializeChat(`session_${Date.now()}`, instruction, [], language, user.username);
     
-    await initializeChat(`session_${Date.now()}`, baseInstruction, [], language, user.username);
-    
-    const salutationContext = `Persona: ${personaContext}. Target: Build alliance and initiate ${category.id} protocol.`;
+    const salutationContext = `Initial Consultation for ${category.id}.`;
     const greeting = await getInitialAISalutation(category.id, language, salutationContext);
     const initialMsg = { id: Date.now().toString(), role: Role.MODEL, text: greeting, timestamp: new Date() };
     setMessages([initialMsg]);
     setIsStreaming(false);
-
-    if (outputMode === 'audio') await speakAIResponse(greeting);
-  };
-
-  const getVoiceForPersona = () => {
-    if (category.id === 'DISTINCT_MINDS' || category.id === 'AUTISM' || category.id === 'ADHD') return 'Kore'; 
-    if (category.id === 'STORYTELLING' || category.id === 'SLEEP') return 'Puck'; 
-    return user.gender === 'female' ? 'Charon' : 'Puck'; 
-  };
-
-  const stopAudio = () => {
-    if (currentSourceRef.current) { try { currentSourceRef.current.stop(); } catch(e){} }
-    setIsSpeaking(false);
-    setIsPaused(false);
-  };
-
-  const speakAIResponse = async (text: string) => {
-    if (!audioCtxRef.current) audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-    stopAudio();
-    setIsSpeaking(true);
-    
-    const result = await generateSpeech(text, getVoiceForPersona());
-    if (result?.audioBuffer && outputMode === 'audio') {
-      const source = audioCtxRef.current.createBufferSource();
-      source.buffer = result.audioBuffer;
-      source.connect(audioCtxRef.current.destination);
-      source.onended = () => { setIsSpeaking(false); triggerHaptic(); };
-      currentSourceRef.current = source;
-      source.start(0);
-    } else { setIsSpeaking(false); }
   };
 
   const handleSend = async () => {
@@ -130,23 +116,24 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack, ther
             aiText += chunk;
             setMessages(prev => prev.map(m => m.id === aiId ? { ...m, text: aiText } : m));
         }
-        if (outputMode === 'audio') await speakAIResponse(aiText);
     } catch (e) { console.error(e); } finally { setIsStreaming(false); }
   };
 
   const handleFinishSession = async () => {
-    if (isFinishing || messages.length < 2) return;
+    if (isFinishing) return;
     setIsFinishing(true);
-    stopAudio();
+    liveVoiceService.stop();
     triggerHaptic();
     try {
-        const summary = await generateSessionSummary(category.id, messages, language);
-        if (summary) {
-            const existing = JSON.parse(localStorage.getItem('sakinnah_clinical_records') || '[]');
-            localStorage.setItem('sakinnah_clinical_records', JSON.stringify([summary, ...existing]));
-            triggerSuccessHaptic();
-            onBack();
+        if (messages.length >= 2) {
+            const summary = await generateSessionSummary(category.id, messages, language);
+            if (summary) {
+                const existing = JSON.parse(localStorage.getItem('sakinnah_clinical_records') || '[]');
+                localStorage.setItem('sakinnah_clinical_records', JSON.stringify([summary, ...existing]));
+                triggerSuccessHaptic();
+            }
         }
+        onBack();
     } catch (e) { setIsFinishing(false); }
   };
 
@@ -176,14 +163,90 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack, ther
     );
   }
 
+  // AUDIO MODE UI (Full Screen Emotive Overlay)
+  if (outputMode === 'audio') {
+    return (
+      <div className="h-full bg-[#030508] flex flex-col items-center justify-between pt-safe pb-safe text-white animate-m3-fade-in overflow-hidden relative">
+        <div className="absolute inset-0 opacity-20 pointer-events-none">
+            <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150vw] h-[150vw] rounded-full blur-[120px] transition-all duration-1000 ${sessionState === 'speaking' ? 'bg-m3-primary/30' : 'bg-m3-tertiary/20'}`}
+                 style={{ transform: `translate(-50%, -50%) scale(${1 + userVolume * 2})` }}></div>
+        </div>
+
+        <header className="w-full px-8 py-6 flex justify-between items-center z-20">
+            <button onClick={() => { liveVoiceService.stop(); setOutputMode(null); }} className="p-3 bg-white/5 border border-white/10 rounded-2xl active:scale-90">
+                <X size={24} />
+            </button>
+            <div className="flex flex-col items-center">
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-m3-primary">{t[category.id]}</span>
+                <p className="text-[14px] font-bold opacity-60">{sessionState === 'speaking' ? t.aiTurnPrompt : t.userTurnPrompt}</p>
+            </div>
+            <button onClick={handleFinishSession} className="p-3 bg-red-500/20 text-red-500 rounded-2xl active:scale-90">
+                <LogOut size={24} />
+            </button>
+        </header>
+
+        <main className="flex-1 w-full flex flex-col items-center justify-center relative px-10">
+            <div className="relative">
+                <div className={`absolute inset-[-40px] rounded-full blur-3xl opacity-30 transition-all duration-1000 ${sessionState === 'speaking' ? 'bg-m3-primary' : 'bg-m3-tertiary'}`}></div>
+                <div className={`w-60 h-60 rounded-[4rem] flex flex-col items-center justify-center relative z-10 border-2 border-white/10 shadow-2xl transition-all duration-500 bg-white/5 backdrop-blur-xl
+                    ${sessionState === 'speaking' ? 'scale-110' : 'scale-100'}`}>
+                    <div className="text-8xl animate-float">🧘‍♀️</div>
+                    {sessionState === 'listening' && (
+                        <div className="absolute bottom-10 flex gap-1.5">
+                            {[...Array(5)].map((_, i) => (
+                                <div key={i} className="w-1 bg-m3-tertiary rounded-full animate-pulse" 
+                                     style={{ height: `${10 + Math.random() * 30}px`, animationDelay: `${i * 0.1}s` }}></div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <div className="mt-20 text-center space-y-6 max-w-sm">
+                <h2 className="text-3xl font-light italic font-serif tracking-tight">
+                    {sessionState === 'speaking' ? 'In presence of Sakinnah' : 'Listening to you...'}
+                </h2>
+                <div className="h-32 flex items-center justify-center">
+                    <p className="text-white/40 text-lg italic font-medium leading-relaxed animate-m3-fade-in text-center px-4 line-clamp-3">
+                        {transcript || "Speak freely, I am listening with care..."}
+                    </p>
+                </div>
+            </div>
+        </main>
+
+        <footer className="w-full px-10 pb-16 flex flex-col items-center gap-10 z-20">
+            <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-[0.4em] opacity-30">
+                <div className="w-1.5 h-1.5 bg-m3-tertiary rounded-full animate-pulse"></div>
+                <span>Strict Turn-Based Link Active</span>
+            </div>
+            <div className="flex items-center gap-6">
+                <button onClick={() => { liveVoiceService.stop(); setOutputMode('text'); }} className="p-6 rounded-[2rem] bg-white/5 border border-white/10 text-white/40 hover:text-white transition-all">
+                    <MessageSquare size={24} />
+                </button>
+                <div className="w-24 h-24 bg-red-600 rounded-full flex items-center justify-center shadow-2xl active:scale-95 transition-all border-4 border-black" onClick={handleFinishSession}>
+                    <Phone size={32} className="rotate-[135deg]" />
+                </div>
+                <button className="p-6 rounded-[2rem] bg-white/5 border border-white/10 text-white/40 opacity-20 pointer-events-none">
+                    <MicOff size={24} />
+                </button>
+            </div>
+        </footer>
+      </div>
+    );
+  }
+
+  // TEXT MODE UI
   return (
     <div className="h-full bg-white flex flex-col animate-m3-fade-in relative overflow-hidden">
       <header className="px-6 py-4 flex items-center bg-white border-b border-m3-outline/10 z-20 shadow-sm">
-        <button onClick={() => { stopAudio(); onBack(); }} className="p-2 text-m3-primary -ms-2 hover:bg-m3-surfaceVariant rounded-m3-md">
+        <button onClick={onBack} className="p-2 text-m3-primary -ms-2 hover:bg-m3-surfaceVariant rounded-m3-md">
           {isRTL ? <ArrowRight size={24} /> : <ArrowLeft size={24} />}
         </button>
         <div className="flex-1 px-4"><h1 className="text-[17px] font-bold text-m3-onSurface tracking-tight">{t[category.id] || category.id}</h1></div>
         <div className="flex items-center gap-2">
+          <button onClick={() => setOutputMode('audio')} className="p-3 text-m3-primary hover:bg-m3-primaryContainer rounded-m3-md transition-all active:scale-90">
+             <Volume2 size={22} />
+          </button>
           <button onClick={handleFinishSession} disabled={isFinishing || messages.length < 2} className="p-3 text-m3-error hover:bg-red-50 rounded-m3-md transition-all active:scale-90 disabled:opacity-30">
             {isFinishing ? <Loader2 size={22} className="animate-spin" /> : <LogOut size={22} />}
           </button>
@@ -192,30 +255,10 @@ const ChatInterface: React.FC<Props> = ({ user, category, language, onBack, ther
 
       <div className="flex-1 overflow-y-auto no-scrollbar p-6 space-y-8 bg-m3-background/30">
         {messages.map(m => (
-          <ChatMessage key={m.id} msg={m} language={language} isStreaming={isStreaming && m.role === Role.MODEL && m.text === ""} isSpeaking={isSpeaking && m.role === Role.MODEL} onSpeak={() => speakAIResponse(m.text)} onCopy={() => navigator.clipboard.writeText(m.text)} onBookmark={() => {}} />
+          <ChatMessage key={m.id} msg={m} language={language} isStreaming={isStreaming && m.role === Role.MODEL && m.text === ""} isSpeaking={false} onSpeak={() => {}} onCopy={() => navigator.clipboard.writeText(m.text)} onBookmark={() => {}} />
         ))}
         <div ref={messagesEndRef} />
       </div>
-
-      {outputMode === 'audio' && (
-        <div className="absolute inset-0 bg-white/95 backdrop-blur-3xl z-10 flex flex-col items-center justify-center p-8 text-center animate-m3-fade-in pointer-events-none">
-            <div className={`w-64 h-64 rounded-m3-xl bg-white shadow-premium flex items-center justify-center relative transition-all duration-700 ${isSpeaking ? 'scale-105' : 'scale-100'}`}>
-                <div className="text-8xl animate-float">🧘‍♀️</div>
-                {isSpeaking && (
-                    <div className="absolute inset-0 flex items-center justify-center gap-2 px-12">
-                        {[...Array(5)].map((_, i) => (
-                            <div key={i} className="w-1.5 bg-m3-primary rounded-full animate-pulse" 
-                                 style={{ height: `${30 + Math.random() * 40}%`, animationDelay: `${i * 0.1}s` }}></div>
-                        ))}
-                    </div>
-                )}
-            </div>
-            <div className="mt-16 space-y-3 pointer-events-auto">
-                <h3 className="text-2xl font-black text-m3-primary tracking-tight">{isSpeaking ? t.aiTurnPrompt : t.userTurnPrompt}</h3>
-                <p className="text-[14px] text-m3-onSurfaceVariant/60 font-bold uppercase tracking-widest">{isSpeaking ? t.listeningToPersona.replace('{name}', category.id === 'DISTINCT_MINDS' ? 'Mama May' : 'Sakinnah') : 'Listening...'}</p>
-            </div>
-        </div>
-      )}
 
       <div className="p-6 bg-white border-t border-m3-outline/10 z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
         <ChatInput inputText={inputText} setInputText={setInputText} onSend={handleSend} isListening={false} onToggleMic={()=>{}} isStreaming={isStreaming} language={language} t={t} isRTL={isRTL} />

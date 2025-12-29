@@ -63,12 +63,19 @@ export const liveVoiceService = {
 
   async connect(config: { 
     systemInstruction: string, 
-    voiceName: 'Puck' | 'Charon' | 'Kore' | 'Fenrir' | 'Zephyr',
+    userGender?: 'male' | 'female',
+    voiceName?: string,
     onTranscript?: (text: string) => void,
     onVolumeUpdate?: (volume: number) => void,
+    onStateChange?: (state: 'listening' | 'speaking' | 'thinking') => void,
     onError?: (error: any) => void
   }) {
     this.stop(); 
+
+    // GENDER-ADAPTIVE VOICE SELECTION OR EXPLICIT OVERRIDE
+    // User Female -> Male AI (Charon)
+    // User Male -> Female AI (Kore)
+    const selectedVoice = config.voiceName || (config.userGender === 'female' ? 'Charon' : 'Kore');
 
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     inputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
@@ -86,7 +93,7 @@ export const liveVoiceService = {
       model: 'gemini-2.5-flash-native-audio-preview-09-2025',
       callbacks: {
         onopen: () => {
-          console.log("🎙️ Live Voice Session Started");
+          console.log(`🎙️ Voice Session Started with voice: ${selectedVoice}`);
           if (!inputAudioContext || !this.sessionPromise) return;
           
           audioSource = inputAudioContext.createMediaStreamSource(stream);
@@ -98,7 +105,8 @@ export const liveVoiceService = {
             // Calc volume for UI
             let sum = 0;
             for(let i=0; i<inputData.length; i++) sum += inputData[i] * inputData[i];
-            config.onVolumeUpdate?.(Math.sqrt(sum / inputData.length));
+            const vol = Math.sqrt(sum / inputData.length);
+            config.onVolumeUpdate?.(vol);
 
             const pcmBlob = createAudioBlob(inputData);
             this.sessionPromise?.then(session => {
@@ -108,6 +116,7 @@ export const liveVoiceService = {
 
           audioSource.connect(scriptProcessor);
           scriptProcessor.connect(inputAudioContext.destination);
+          config.onStateChange?.('speaking'); // AI starts first usually
         },
         onmessage: async (message: LiveServerMessage) => {
           // Handle Model Transcription
@@ -115,11 +124,20 @@ export const liveVoiceService = {
              config.onTranscript?.(message.serverContent.outputTranscription.text);
           }
 
-          // Handle Interruption (Critical for Realism)
+          // Handle Interruption (CRITICAL OVERRIDE: AI MUST stop speaking immediately)
           if (message.serverContent?.interrupted) {
             activeSources.forEach(s => { try { s.stop(); } catch(e){} });
             activeSources.clear();
             nextStartTime = 0;
+            config.onStateChange?.('listening');
+          }
+
+          if (message.serverContent?.modelTurn) {
+              config.onStateChange?.('speaking');
+          }
+
+          if (message.serverContent?.turnComplete) {
+              config.onStateChange?.('listening');
           }
 
           // Handle Audio Output
@@ -135,7 +153,13 @@ export const liveVoiceService = {
             const source = outputAudioContext.createBufferSource();
             source.buffer = audioBuffer;
             source.connect(outputAudioContext.destination);
-            source.onended = () => activeSources.delete(source);
+            source.onended = () => {
+                activeSources.delete(source);
+                if (activeSources.size === 0) {
+                    // All AI speech segments finished
+                    // Mic is already active via ScriptProcessor
+                }
+            };
             source.start(nextStartTime);
             nextStartTime += audioBuffer.duration;
             activeSources.add(source);
@@ -150,10 +174,11 @@ export const liveVoiceService = {
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
-          voiceConfig: { prebuiltVoiceConfig: { voiceName: config.voiceName } },
+          voiceConfig: { prebuiltVoiceConfig: { voiceName: selectedVoice } },
         },
-        systemInstruction: config.systemInstruction,
+        systemInstruction: config.systemInstruction + "\nSTRICT TURN-TAKING: Only speak after the user finishes. Stop immediately if interrupted. Be brief and warm.",
         outputAudioTranscription: {},
+        inputAudioTranscription: {},
       },
     });
   },

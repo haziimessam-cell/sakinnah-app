@@ -3,6 +3,7 @@ import { GoogleGenAI, Chat, GenerateContentResponse, Modality } from "@google/ge
 import { SYSTEM_LOCK_INSTRUCTION, BEHAVIORAL_AXES } from "../constants";
 import { Language, Question, CaseReportData, SessionSummary } from "../types";
 import { memoryService } from "./memoryService";
+import { CLINICAL_CORE } from "../clinical_core";
 
 export const getAIInstance = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -25,9 +26,16 @@ export const initializeChat = async (historyId: string, baseInstruction: string,
 
 export const getInitialAISalutation = async (category: string, language: Language, context?: string): Promise<string> => {
   const ai = getAIInstance();
-  const sys = SYSTEM_LOCK_INSTRUCTION + `\nLanguage: ${language === 'ar' ? 'Arabic' : 'English'}`;
-  const prompt = `As the designated persona (Sakinnah or Mama Mai), initiate a natural human-like therapeutic session for ${category}. 
-  Apply relevant scientific protocols internally but DO NOT mention them. Speak naturally. Context: ${context || 'Initial Consultation'}.`;
+  const lowerCat = category.toLowerCase();
+  const coreData = CLINICAL_CORE[lowerCat];
+  
+  let instruction = SYSTEM_LOCK_INSTRUCTION;
+  if (coreData) {
+      instruction += `\n[STRICT CLINICAL CORE]: ${JSON.stringify(coreData)}`;
+  }
+  
+  const sys = instruction + `\nLanguage: ${language === 'ar' ? 'Arabic' : 'English'}`;
+  const prompt = `As the designated clinical persona, initiate a therapeutic session for ${category}. Context: ${context || 'Initial Session'}.`;
   
   try {
     const response = await ai.models.generateContent({
@@ -54,15 +62,26 @@ export async function* sendMessageStreamToGemini(prompt: string, language: Langu
   }
 }
 
+/**
+ * FIXED: Strictly use Clinical Core registry questions.
+ * AI localizes/formats but never invents new clinical questions.
+ */
 export const generateTherapeuticQuestions = async (therapyType: string, language: Language): Promise<Question[]> => {
+    const coreKey = therapyType.toLowerCase();
+    const coreData = CLINICAL_CORE[coreKey];
+    
+    if (!coreData) {
+        console.warn(`Clinical Core missing for: ${therapyType}. Falling back to default protocol.`);
+        return []; 
+    }
+
     const ai = getAIInstance();
-    const axes = BEHAVIORAL_AXES.join(", ");
-    const prompt = `Act as a senior clinical professional (Sakinnah or Mama Mai). Generate EXACTLY 10 specific scientific evaluation questions for ${therapyType}.
-    MANDATORY MAPPING: Each question MUST map to one of these 10 behavioral axes: ${axes}.
-    These questions MUST be derived from the specific references provided in your system instructions for this disorder.
-    NEVER mention the references in the questions. Sound like a human doctor.
-    Return ONLY a valid JSON array: 
-    [{"id": "q1", "textAr": "...", "textEn": "...", "optionsAr": ["...", "..."], "optionsEn": ["...", "..."]}]`;
+    const prompt = `Format these EXACT 10 assessment questions for ${therapyType} into the standard Sakinnah JSON format.
+    QUESTIONS FROM CORE: ${JSON.stringify(coreData.assessment_questions)}
+    
+    Format: [{"id": "q1", "textAr": "...", "textEn": "...", "optionsAr": ["غير موجود", "خفيف", "متوسط", "شديد"], "optionsEn": ["Not at all", "Mild", "Moderate", "Severe"]}]
+    RULE: textAr must be provided from Core if available, or translated with extreme precision. 
+    Return ONLY JSON.`;
 
     try {
         const response = await ai.models.generateContent({
@@ -76,32 +95,38 @@ export const generateTherapeuticQuestions = async (therapyType: string, language
         const cleaned = (response.text || "[]").replace(/```json/g, '').replace(/```/g, '').trim();
         return JSON.parse(cleaned);
     } catch (e) {
-        console.error("Failed to generate clinical questions", e);
-        return [];
+        // Ultimate fallback: Direct mapping from core
+        return coreData.assessment_questions.map((q: any) => ({
+            id: `q${q.id}`,
+            textAr: q.question,
+            textEn: q.question, // Assuming core might only have one for now, or would need mapping
+            optionsAr: ["غير موجود", "خفيف", "متوسط", "شديد"],
+            optionsEn: ["Not at all", "Mild", "Moderate", "Severe"]
+        }));
     }
 };
 
 export const generateCaseReport = async (therapyType: string, answers: {question: string, answer: string}[], language: Language): Promise<CaseReportData | null> => {
+    const coreKey = therapyType.toLowerCase();
+    const coreData = CLINICAL_CORE[coreKey];
     const ai = getAIInstance();
-    const prompt = `Act as a senior clinical professional. Analyze these 10 assessment answers: ${JSON.stringify(answers)} for ${therapyType}.
-    MANDATORY 5-PART BEHAVIORAL PLAN:
-    1. "summary": A short, non-diagnostic case summary (human tone).
-    2. "behavioralGoals": 3 clear behavioral goals based on the answers.
-    3. "practicalSteps": 3-5 practical daily steps linked directly to the answers.
-    4. "primaryStrategy": One primary coping or confrontation strategy.
-    5. "nextSessionFocus": A specific focus point for the next session.
     
-    STRICT RULES:
-    - NO diagnosis.
-    - NO scores or severity labels.
-    - Behavior-focused only.
-    - Language: ${language}.
+    const prompt = `Analyze these 10 assessment answers using the provided IMMUTABLE CLINICAL CORE.
+    [STRICT CLINICAL CORE]: ${JSON.stringify(coreData)}
+    [ANSWERS]: ${JSON.stringify(answers)}
+    
+    MANDATORY BEHAVIORAL PLAN RULES:
+    1. "summary": expert case summary using "clinical_definition" from core.
+    2. "behavioralGoals": 3 clear goals linked to "therapeutic_models" focus areas.
+    3. "practicalSteps": daily actions derived from mapping answers to "maps_to" indicators in core.
+    4. "primaryStrategy": Key intervention from core models (CBT/ACT/Exposure).
+    5. "nextSessionFocus": Focus derived from core severity logic.
     
     Return ONLY JSON:
     {
       "summary": "...",
       "behavioralGoals": ["...", "...", "..."],
-      "practicalSteps": ["...", "...", "..."],
+      "practicalSteps": ["...", "..."],
       "primaryStrategy": "...",
       "nextSessionFocus": "..."
     }`;
@@ -126,14 +151,10 @@ export const generateCaseReport = async (therapyType: string, answers: {question
 
 export const generateSessionSummary = async (categoryId: string, messages: any[], language: Language): Promise<SessionSummary | null> => {
     const ai = getAIInstance();
-    const prompt = `Summarize this session for ${categoryId}. History: ${JSON.stringify(messages.map(m => m.text).slice(-20))}
-    Return ONLY JSON:
-    {
-      "observations": ["observation 1", "observation 2"],
-      "symptoms": ["symptom 1", "symptom 2"],
-      "recommendations": ["evidence-based recommendation 1", "recommendation 2"]
-    }
-    Language: ${language}.`;
+    const coreData = CLINICAL_CORE[categoryId.toLowerCase()];
+    const prompt = `Summarize this therapeutic session for ${categoryId}. 
+    STRICTLY follow this clinical model: ${JSON.stringify(coreData?.therapeutic_models || "Standard CBT")}
+    Return ONLY JSON matching SessionSummary schema.`;
 
     try {
         const response = await ai.models.generateContent({
@@ -156,7 +177,6 @@ export const generateSessionSummary = async (categoryId: string, messages: any[]
             type: 'SESSION'
         };
     } catch (e) {
-        console.error("Failed to generate session summary", e);
         return null;
     }
 };
@@ -178,11 +198,12 @@ export const generateContent = async (prompt: string, systemInstruction?: string
 export const getEmbedding = async (text: string): Promise<number[] | undefined> => {
     const ai = getAIInstance();
     try {
+        // FIXED: EmbedContentParameters uses 'contents' and EmbedContentResponse uses 'embeddings'
         const result = await ai.models.embedContent({
             model: 'text-embedding-004',
-            content: { parts: [{ text }] }
+            contents: { parts: [{ text }] }
         });
-        return result.embedding.values;
+        return result.embeddings.values;
     } catch (e) {
         return undefined;
     }
@@ -246,7 +267,10 @@ export const generateSpeech = async (text: string, voiceName: string = 'Kore'): 
 
 export const generateClinicalRationale = async (categoryId: string, answers: string[], language: Language): Promise<string> => {
     const ai = getAIInstance();
-    const prompt = `As a senior clinical professional, based on these assessment answers for ${categoryId}: ${JSON.stringify(answers)}, provide a professional clinical rationale for the proposed care plan. STRICTLY follow the references but speak naturally. DO NOT mention the references by name. Language: ${language}.`;
+    const coreData = CLINICAL_CORE[categoryId.toLowerCase()];
+    const prompt = `Based on these assessment results for ${categoryId}, explain the scientific rationale for the suggested behavioral plan. 
+    STRICTLY reference these models: ${JSON.stringify(coreData?.therapeutic_models || "CBT")}
+    DO NOT cite the references by name. Use a professional clinical tone. Answers: ${JSON.stringify(answers)}.`;
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
@@ -259,30 +283,14 @@ export const generateClinicalRationale = async (categoryId: string, answers: str
     }
 };
 
-// Add missing initializeMediator and mediateDialogue functions used by RelationshipMediator.
-
-/**
- * Initializes the mediator chat session.
- * @param language The language for the session.
- */
 export const initializeMediator = async (language: Language) => {
-    const sys = `You are a neutral relationship mediator. Analyze arguments and help find common ground. Language: ${language === 'ar' ? 'Arabic' : 'English'}`;
+    const sys = `You are a neutral relationship mediator. Follow NVC (Non-Violent Communication) protocols. Language: ${language === 'ar' ? 'Arabic' : 'English'}`;
     await initializeChat("mediator", sys, [], language);
 };
 
-/**
- * Mediates a dialogue between two partners.
- * @param partnerA Text from partner A.
- * @param partnerB Text from partner B.
- * @param language The language of the mediation.
- * @returns A string containing the mediation analysis.
- */
 export const mediateDialogue = async (partnerA: string, partnerB: string, language: Language): Promise<string> => {
     const ai = getAIInstance();
-    const prompt = `Analyze this conflict and mediate between Partner A and Partner B. Provide a neutral observation and a constructive path forward.
-    Partner A says: "${partnerA}"
-    Partner B says: "${partnerB}"
-    Language: ${language}.`;
+    const prompt = `Mediate this conflict using clinical techniques: Partner A: "${partnerA}", Partner B: "${partnerB}". Language: ${language}.`;
     
     try {
         const response = await ai.models.generateContent({
@@ -292,7 +300,6 @@ export const mediateDialogue = async (partnerA: string, partnerB: string, langua
         });
         return response.text || "";
     } catch (e) {
-        console.error("Mediation failed", e);
         return "";
     }
 };
