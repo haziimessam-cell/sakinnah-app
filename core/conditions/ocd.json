@@ -1,0 +1,89 @@
+{
+  "condition": "Obsessive Compulsive Disorder (OCD)",
+  "locked": true,
+  "description": {
+    "short": "اضطراب يتميز بأفكار وسواسية متكررة وسلوكيات قهرية تهدف لتقليل القلق.",
+    "display_on_click": true
+  },
+  "scientific_references": [
+    "DSM-5-TR",
+    "Y-BOCS Scale",
+    "ERP – Foa et al.",
+    "CBT for OCD – Salkovskis",
+    "NICE OCD Guidelines 2023"
+  ],
+  "therapeutic_approach": [
+    "Exposure and Response Prevention (ERP)",
+    "Cognitive Behavioral Therapy (CBT-OCD)",
+    "Inhibitory Learning Model",
+    "Psychoeducation"
+  ],
+  "questions": [
+    {
+      "id": 1,
+      "text": "هل تراودك أفكار غير مرغوبة ومتكررة تقتحم ذهنك رغم محاولتك تجاهلها؟",
+      "clinical_goal": "تحديد وجود أفكار وسواسية Intrusive Thoughts",
+      "affects": ["severity", "diagnosis_confirmation"]
+    },
+    {
+      "id": 2,
+      "text": "إلى أي مدى تسبب لك هذه الأفكار قلقًا أو ضيقًا نفسيًا واضحًا؟",
+      "clinical_goal": "قياس شدة القلق المرتبط بالوسواس",
+      "affects": ["severity"]
+    },
+    {
+      "id": 3,
+      "text": "هل تشعر بأنك مضطر للقيام بأفعال أو طقوس معينة لتخفيف هذا القلق؟",
+      "clinical_goal": "تحديد وجود سلوكيات قهرية",
+      "affects": ["compulsion_presence"]
+    },
+    {
+      "id": 4,
+      "text": "هل تستغرق هذه الطقوس أو الأفكار أكثر من ساعة يوميًا من وقتك؟",
+      "clinical_goal": "قياس التأثير الزمني (Y-BOCS)",
+      "affects": ["severity"]
+    },
+    {
+      "id": 5,
+      "text": "هل تحاول مقاومة الأفكار أو الطقوس ولكن تجد صعوبة في ذلك؟",
+      "clinical_goal": "قياس مستوى المقاومة والتحكم",
+      "affects": ["treatment_plan"]
+    },
+    {
+      "id": 6,
+      "text": "هل تؤثر هذه الأفكار أو السلوكيات على حياتك الاجتماعية أو العملية؟",
+      "clinical_goal": "تقييم مستوى الإعاقة الوظيفية",
+      "affects": ["severity"]
+    },
+    {
+      "id": 7,
+      "text": "هل تشعر بأن هذه الأفكار لا تعبر عن شخصيتك أو قيمك؟",
+      "clinical_goal": "تمييز الوسواس عن الذهان",
+      "affects": ["diagnostic_safety"]
+    },
+    {
+      "id": 8,
+      "text": "هل تزداد شدة الأفكار أو الطقوس في أوقات التوتر أو الإرهاق؟",
+      "clinical_goal": "تحديد المحفزات",
+      "affects": ["session_focus"]
+    },
+    {
+      "id": 9,
+      "text": "هل سبق أن تجنبت مواقف أو أماكن خوفًا من إثارة هذه الأفكار؟",
+      "clinical_goal": "تقييم التجنب السلوكي",
+      "affects": ["erp_design"]
+    },
+    {
+      "id": 10,
+      "text": "ما مدى استعدادك لتجربة أسلوب علاجي يتضمن مواجهة تدريجية دون تنفيذ الطقوس؟",
+      "clinical_goal": "تقييم جاهزية ERP",
+      "affects": ["treatment_readiness"]
+    }
+  ],
+  "post_assessment_logic": {
+    "session_frequency": "2-3 sessions per week",
+    "session_duration": "30-45 minutes",
+    "next_step": "booking_session",
+    "summary_style": "clinical_short"
+  }
+}
