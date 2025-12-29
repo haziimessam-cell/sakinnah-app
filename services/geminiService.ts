@@ -198,12 +198,13 @@ export const generateContent = async (prompt: string, systemInstruction?: string
 export const getEmbedding = async (text: string): Promise<number[] | undefined> => {
     const ai = getAIInstance();
     try {
-        // FIXED: EmbedContentParameters uses 'contents' and EmbedContentResponse uses 'embeddings'
+        // Fix: Use 'content' (singular) for single embedding request and access 'embedding.values' in response.
+        // This avoids accessing the method 'values()' on an array, which caused an IterableIterator error.
         const result = await ai.models.embedContent({
             model: 'text-embedding-004',
-            contents: { parts: [{ text }] }
+            content: { parts: [{ text }] }
         });
-        return result.embeddings.values;
+        return result.embedding.values;
     } catch (e) {
         return undefined;
     }

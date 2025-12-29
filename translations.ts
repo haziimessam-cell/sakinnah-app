@@ -1,3 +1,4 @@
+
 export const translations = {
   ar: {
     welcome: "مرحباً بك في سكينة",
@@ -87,6 +88,19 @@ export const translations = {
     back: "رجوع",
     save: "حفظ",
     clinicalNote: "سكينة.. رفيقك الأمين لسلامك النفسي",
+    selectTherapyType: "اختر نوع الجلسة",
+    selectNeuroType: "اختر نوع الدعم",
+    storyLoading: "جاري تجهيز الحكاية...",
+    pause: "إيقاف مؤقت",
+    storyOnlyNote: "هذه التجربة صوتية بالكامل للتركيز.",
+    grandmaNamePlaceholder: "اسم الجدة",
+    childNameLabel: "اسم الطفل",
+    listeningToGrandma: "تستمع الآن للجدة {name}",
+    trackRelaxing: "موسيقى الاسترخاء العميق",
+    sleepMusicMode: "موسيقى هادئة",
+    sleepStoryMode: "حكاية الجدة",
+    sleepDurationTitle: "مدة الجلسة",
+    startMusic: "بدء الهدوء",
   },
   en: {
     welcome: "Welcome to Sakinnah",
@@ -171,5 +185,18 @@ export const translations = {
     back: "Back",
     save: "Save",
     clinicalNote: "Sakinnah: Your faithful companion for inner peace",
+    selectTherapyType: "Select Therapy Type",
+    selectNeuroType: "Select Support Type",
+    storyLoading: "Preparing the tale...",
+    pause: "Pause",
+    storyOnlyNote: "This is a purely audio experience for focus.",
+    grandmaNamePlaceholder: "Grandma's Name",
+    childNameLabel: "Child's Name",
+    listeningToGrandma: "Listening to Grandma {name}",
+    trackRelaxing: "Deep Relaxation Music",
+    sleepMusicMode: "Calm Music",
+    sleepStoryMode: "Grandma's Story",
+    sleepDurationTitle: "Session Duration",
+    startMusic: "Start Serenity",
   }
 };
