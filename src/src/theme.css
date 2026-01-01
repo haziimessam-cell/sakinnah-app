@@ -1,0 +1,66 @@
+/* src/theme.css */
+
+:root {
+  --bg-main: #f7f9fc;
+  --card-bg: #ffffff;
+  --primary: #3b5bfd;
+  --secondary: #6b7280;
+  --border: #e5e7eb;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", "Segoe UI", sans-serif;
+  background-color: var(--bg-main);
+}
+
+.app-container {
+  padding: 24px;
+  max-width: 480px;
+  margin: auto;
+}
+
+.app-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 24px;
+  color: #111827;
+}
+
+.cards-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.clinic-card {
+  display: flex;
+  align-items: center;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clinic-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+}
+
+.clinic-icon {
+  font-size: 28px;
+  margin-right: 16px;
+}
+
+.clinic-content h2 {
+  margin: 0;
+  font-size: 16px;
+  color: #111827;
+}
+
+.clinic-content span {
+  font-size: 12px;
+  color: var(--secondary);
+}
